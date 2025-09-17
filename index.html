@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Britannia Reborn - Enhanced Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameCanvas {
+            width: 100%;
+            height: 100vh;
+            display: block;
+            outline: none;
+        }
+        
+        #gameUI {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        #loadingScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            z-index: 200;
+        }
+        
+        #errorScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6666;
+            font-size: 16px;
+            text-align: center;
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 10px;
+            display: none;
+            z-index: 200;
+            max-width: 80%;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #333;
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .ui-section {
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .ui-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen">
+        <div>🏰 Loading Enhanced Britannia...</div>
+        <div class="loading-spinner"></div>
+        <div id="loadingProgress">Initializing...</div>
+    </div>
+    
+    <div id="errorScreen">
+        <h3>⚠️ Game Error</h3>
+        <p id="errorMessage">Checking...</p>
+        <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 15px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>
+    </div>
+    
+    <canvas id="gameCanvas" style="display: none;"></canvas>
+    
+    <div id="gameUI" style="display: none;">
+        <div class="ui-section">
+            <h3>🏰 Britannia Reborn</h3>
+        </div>
+        <div class="ui-section">
+            <div>Position: <span id="playerPos">0, 0</span></div>
+            <div>Region: <span id="playerRegion">Central Plains</span></div>
+            <div>Status: <span id="gameStatus">Exploring</span></div>
+        </div>
+        <div class="ui-section">
+            <strong>Controls:</strong><br>
+            WASD/Arrow Keys: Move<br>
+            Mouse: Rotate Camera<br>
+            Space: Interact
+        </div>
+        <div class="ui-section">
+            <strong>🗺️ Regions:</strong><br>
+            🌲 Whispering Woods (NW)<br>
+            🏜️ Golden Desert (SE)<br>
+            🐸 Shadowmere Swamp (SW)<br>
+            🏰 Mystical Tower (Center)
+        </div>
+    </div>
+
+    <script>
+        console.log("🏰 Starting Enhanced Britannia Reborn...");
+        
+        // Block gamepad to prevent conflicts
+        if (navigator.getGamepads) {
+            navigator.getGamepads = function() { return []; };
+            console.log("Gamepad API blocked for stability");
+        }
+        
+        // Check WebGL support
+        function checkWebGL() {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                return !!gl;
+            } catch(e) {
+                return false;
+            }
+        }
+        
+        function updateLoadingProgress(text) {
+            const progressEl = document.getElementById('loadingProgress');
+            if (progressEl) {
+                progressEl.textContent = text;
+            }
+            console.log("📍", text);
+        }
+        
+        function showError(message) {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('errorScreen').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+            console.error("❌ Game Error:", message);
+        }
+        
+        function loadBabylonJS() {
+            updateLoadingProgress("Checking WebGL support...");
+            
+            if (!checkWebGL()) {
+                showError("WebGL is not supported in this browser. Please use Chrome, Firefox, Safari, or Edge.");
+                return;
+            }
+            
+            updateLoadingProgress("Loading enhanced 3D engine...");
+            
+            // Use updated Babylon.js with fallback
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.33.1/babylon.min.js';
+            
+            script.onload = function() {
+                updateLoadingProgress("3D engine loaded successfully!");
+                console.log("✅ Babylon.js 6.33.1 loaded");
+                setTimeout(initializeEnhancedGame, 500);
+            };
+            
+            script.onerror = function() {
+                console.warn("❌ Failed to load from primary CDN, trying fallback...");
+                const altScript = document.createElement('script');
+                altScript.src = 'https://cdn.babylonjs.com/babylon.js';
+                
+                altScript.onload = function() {
+                    updateLoadingProgress("3D engine loaded (fallback)!");
+                    console.log("✅ Babylon.js loaded from fallback CDN");
+                    setTimeout(initializeEnhancedGame, 500);
+                };
+                
+                altScript.onerror = function() {
+                    showError("Failed to load 3D engine. Please check your internet connection and try again.");
+                };
+                
+                document.head.appendChild(altScript);
+            };
+            
+            document.head.appendChild(script);
+        }
+        
+        function initializeEnhancedGame() {
+            try {
+                updateLoadingProgress("Initializing enhanced 3D world...");
+                
+                if (typeof BABYLON === 'undefined') {
+                    throw new Error("Babylon.js library not loaded");
+                }
+                
+                const canvas = document.getElementById('gameCanvas');
+                if (!canvas) {
+                    throw new Error("Canvas element not found");
+                }
+                
+                console.log("✅ Creating enhanced Babylon engine...");
+                const engine = new BABYLON.Engine(canvas, true, { 
+                    antialias: true,
+                    powerPreference: "high-performance",
+                    stencil: true,
+                    preserveDrawingBuffer: true,
+                    alpha: false
+                });
+                
+                engine.setHardwareScalingLevel(1.0);
+                
+                updateLoadingProgress("Creating enhanced scene...");
+                const scene = new BABYLON.Scene(engine);
+                scene.clearColor = new BABYLON.Color3(0.2, 0.4, 0.6);
+                scene.fogEnabled = false;
+                scene.autoClear = true;
+                scene.autoClearDepthAndStencil = true;
+                
+                updateLoadingProgress("Setting up enhanced camera system...");
+                const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 10, -10), scene);
+                camera.setTarget(BABYLON.Vector3.Zero());
+                
+                // Camera controls
+                let isMouseDown = false;
+                let lastMouseX = 0;
+                let lastMouseY = 0;
+                let alpha = 0;
+                let distance = 15;
+                
+                canvas.addEventListener('mousedown', function(event) {
+                    if (event.button === 0) {
+                        isMouseDown = true;
+                        lastMouseX = event.clientX;
+                        lastMouseY = event.clientY;
+                        canvas.style.cursor = "grabbing";
+                        event.preventDefault();
+                    }
+                });
+                
+                canvas.addEventListener('mouseup', function() {
+                    isMouseDown = false;
+                    canvas.style.cursor = "grab";
+                });
+                
+                canvas.addEventListener('mouseleave', function() {
+                    isMouseDown = false;
+                    canvas.style.cursor = "grab";
+                });
+                
+                canvas.addEventListener('mousemove', function(event) {
+                    if (isMouseDown) {
+                        const deltaX = event.clientX - lastMouseX;
+                        const deltaY = event.clientY - lastMouseY;
+                        
+                        alpha += deltaX * 0.008;
+                        
+                        camera.position.x = player.position.x + Math.sin(alpha) * distance;
+                        camera.position.z = player.position.z + Math.cos(alpha) * distance;
+                        camera.position.y = Math.max(5, Math.min(20, 10 + deltaY * 0.01));
+                        
+                        camera.setTarget(player.position);
+                        
+                        lastMouseX = event.clientX;
+                        lastMouseY = event.clientY;
+                    }
+                });
+                
+                canvas.style.cursor = "grab";
+                
+                updateLoadingProgress("Creating enhanced lighting system...");
+                
+                // Enhanced lighting system
+                const ambientLight = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0), scene);
+                ambientLight.intensity = 0.6;
+                ambientLight.diffuse = new BABYLON.Color3(0.8, 0.9, 1.0);
+                
+                const sunLight = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-1, -1, -1), scene);
+                sunLight.intensity = 0.8;
+                sunLight.diffuse = new BABYLON.Color3(1, 0.95, 0.8);
+                
+                // Enhanced shadows
+                const shadowGenerator = new BABYLON.ShadowGenerator(2048, sunLight);
+                shadowGenerator.useExponentialShadowMap = true;
+                shadowGenerator.bias = 0.0005;
+                shadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
+                shadowGenerator.usePercentageCloserFiltering = true;
+                
+                updateLoadingProgress("Creating diverse terrain regions...");
+                
+                // Main ground
+                const ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 100, height: 100}, scene);
+                const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
+                groundMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
+                ground.material = groundMaterial;
+                ground.receiveShadows = true;
+                
+                // Forest region
+                const forestGround = BABYLON.MeshBuilder.CreateGround("forestGround", {width: 30, height: 25}, scene);
+                forestGround.position.set(-30, 0.01, 20);
+                const forestMaterial = new BABYLON.StandardMaterial("forestMat", scene);
+                forestMaterial.diffuseColor = new BABYLON.Color3(0.15, 0.4, 0.15);
+                forestGround.material = forestMaterial;
+                forestGround.receiveShadows = true;
+                
+                // Desert region
+                const desertGround = BABYLON.MeshBuilder.CreateGround("desertGround", {width: 25, height: 25}, scene);
+                desertGround.position.set(30, 0.01, -25);
+                const desertMaterial = new BABYLON.StandardMaterial("desertMat", scene);
+                desertMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.7, 0.4);
+                desertGround.material = desertMaterial;
+                desertGround.receiveShadows = true;
+                
+                // Swamp region
+                const swampGround = BABYLON.MeshBuilder.CreateGround("swampGround", {width: 20, height: 20}, scene);
+                swampGround.position.set(-35, 0.01, -25);
+                const swampMaterial = new BABYLON.StandardMaterial("swampMat", scene);
+                swampMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.4, 0.2);
+                swampGround.material = swampMaterial;
+                swampGround.receiveShadows = true;
+                
+                updateLoadingProgress("Creating heroic knight character...");
+                
+                // Create enhanced player character
+                const player = new BABYLON.Mesh("enhancedKnight", scene);
+                
+                // Character materials
+                const skinMaterial = new BABYLON.StandardMaterial("skinMat", scene);
+                skinMaterial.diffuseColor = new BABYLON.Color3(0.95, 0.8, 0.7);
+                skinMaterial.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+                skinMaterial.freeze();
+                
+                const armorMaterial = new BABYLON.StandardMaterial("armorMat", scene);
+                armorMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.5, 0.8);
+                armorMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
+                armorMaterial.specularPower = 256;
+                armorMaterial.freeze();
+                
+                const metalMaterial = new BABYLON.StandardMaterial("metalMat", scene);
+                metalMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.8);
+                metalMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
+                metalMaterial.specularPower = 128;
+                metalMaterial.freeze();
+                
+                // Head
+                const head = BABYLON.MeshBuilder.CreateSphere("head", {diameter: 1}, scene);
+                head.position.y = 3.2;
+                head.parent = player;
+                head.material = skinMaterial;
+                
+                // Helmet
+                const helmet = BABYLON.MeshBuilder.CreateSphere("helmet", {diameter: 1.1, segments: 16}, scene);
+                helmet.position.y = 3.3;
+                helmet.scaling.y = 0.8;
+                helmet.parent = player;
+                helmet.material = metalMaterial;
+                
+                // Helmet plume
+                const plume = BABYLON.MeshBuilder.CreateCylinder("plume", {height: 0.8, diameter: 0.1}, scene);
+                plume.position.set(0, 3.9, 0);
+                plume.parent = player;
+                const plumeMaterial = new BABYLON.StandardMaterial("plumeMat", scene);
+                plumeMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.2, 0.2);
+                plume.material = plumeMaterial;
+                
+                // Torso
+                const torso = BABYLON.MeshBuilder.CreateCylinder("torso", {height: 1.8, diameter: 1.2, tessellation: 12}, scene);
+                torso.position.y = 2;
+                torso.parent = player;
+                torso.material = armorMaterial;
+                
+                // Arms
+                const leftArm = BABYLON.MeshBuilder.CreateCylinder("leftArm", {height: 1.4, diameter: 0.35}, scene);
+                leftArm.position.set(-0.75, 2, 0);
+                leftArm.rotation.z = Math.PI / 8;
+                leftArm.parent = player;
+                leftArm.material = skinMaterial;
+                
+                const rightArm = BABYLON.MeshBuilder.CreateCylinder("rightArm", {height: 1.4, diameter: 0.35}, scene);
+                rightArm.position.set(0.75, 2, 0);
+                rightArm.rotation.z = -Math.PI / 8;
+                rightArm.parent = player;
+                rightArm.material = skinMaterial;
+                
+                // Legs
+                const leftLeg = BABYLON.MeshBuilder.CreateCylinder("leftLeg", {height: 1.6, diameter: 0.45}, scene);
+                leftLeg.position.set(-0.3, 0.8, 0);
+                leftLeg.parent = player;
+                leftLeg.material = armorMaterial;
+                
+                const rightLeg = BABYLON.MeshBuilder.CreateCylinder("rightLeg", {height: 1.6, diameter: 0.45}, scene);
+                rightLeg.position.set(0.3, 0.8, 0);
+                rightLeg.parent = player;
+                rightLeg.material = armorMaterial;
+                
+                // Cape
+                const cape = BABYLON.MeshBuilder.CreateBox("cape", {width: 1.6, height: 2.8, depth: 0.1}, scene);
+                cape.position.set(0, 1.9, -0.7);
+                cape.parent = player;
+                const capeMaterial = new BABYLON.StandardMaterial("capeMat", scene);
+                capeMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.1, 0.1);
+                capeMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.02, 0.02);
+                cape.material = capeMaterial;
+                
+                // Sword
+                const sword = BABYLON.MeshBuilder.CreateCylinder("sword", {height: 1.2, diameter: 0.05}, scene);
+                sword.position.set(0.6, 1.5, -0.3);
+                sword.rotation.z = -Math.PI / 4;
+                sword.parent = player;
+                const swordMaterial = new BABYLON.StandardMaterial("swordMat", scene);
+                swordMaterial.diffuseColor = new BABYLON.Color3(0.9, 0.9, 1);
+                swordMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
+                swordMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.2);
+                sword.material = swordMaterial;
+                
+                // Shield
+                const shield = BABYLON.MeshBuilder.CreateCylinder("shield", {height: 0.1, diameter: 1.2}, scene);
+                shield.position.set(-0.2, 2, -0.8);
+                shield.rotation.x = Math.PI / 6;
+                shield.parent = player;
+                const shieldMaterial = new BABYLON.StandardMaterial("shieldMat", scene);
+                shieldMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.6, 0.2);
+                shieldMaterial.specularColor = new BABYLON.Color3(0.9, 0.8, 0.4);
+                shieldMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.08, 0.02);
+                shield.material = shieldMaterial;
+                
+                // Magical aura
+                const aura = BABYLON.MeshBuilder.CreateTorus("aura", {diameter: 2.5, thickness: 0.05}, scene);
+                aura.position.y = 0.1;
+                aura.parent = player;
+                const auraMaterial = new BABYLON.StandardMaterial("auraMat", scene);
+                auraMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1);
+                auraMaterial.emissiveColor = new BABYLON.Color3(0.2, 0.5, 0.8);
+                auraMaterial.alpha = 0.3;
+                aura.material = auraMaterial;
+                
+                // Animate aura
+                const auraRotation = new BABYLON.Animation("auraRotation", "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                const auraKeys = [];
+                auraKeys.push({frame: 0, value: 0});
+                auraKeys.push({frame: 30, value: Math.PI * 2});
+                auraRotation.setKeys(auraKeys);
+                aura.animations = [auraRotation];
+                scene.beginAnimation(aura, 0, 30, true);
+                
+                player.position.y = 0;
+                
+                // Add to shadows
+                shadowGenerator.getShadowMap().renderList.push(player, head, helmet, torso, cape, sword, shield);
+                
+                updateLoadingProgress("Building mystical structures...");
+                
+                // Forest trees
+                for (let i = 0; i < 20; i++) {
+                    const tree = BABYLON.MeshBuilder.CreateCylinder("forestTree", {height: 5 + Math.random() * 2, diameter: 0.6}, scene);
+                    tree.position.x = -40 + Math.random() * 20;
+                    tree.position.z = 10 + Math.random() * 20;
+                    tree.position.y = (5 + Math.random() * 2) / 2;
+                    
+                    const treeMaterial = new BABYLON.StandardMaterial("forestTreeMat", scene);
+                    treeMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.15, 0.1);
+                    tree.material = treeMaterial;
+                    
+                    const crown = BABYLON.MeshBuilder.CreateSphere("crown", {diameter: 2 + Math.random()}, scene);
+                    crown.position = tree.position.clone();
+                    crown.position.y += 2.5;
+                    const crownMaterial = new BABYLON.StandardMaterial("crownMat", scene);
+                    crownMaterial.diffuseColor = new BABYLON.Color3(0.1, 0.4, 0.1);
+                    crown.material = crownMaterial;
+                    
+                    shadowGenerator.getShadowMap().renderList.push(tree, crown);
+                }
+                
+                // Desert cacti
+                for (let i = 0; i < 12; i++) {
+                    const cactus = BABYLON.MeshBuilder.CreateCylinder("cactus", {height: 3 + Math.random(), diameter: 0.4}, scene);
+                    cactus.position.x = 20 + Math.random() * 20;
+                    cactus.position.z = -35 + Math.random() * 20;
+                    cactus.position.y = (3 + Math.random()) / 2;
+                    
+                    const cactusMaterial = new BABYLON.StandardMaterial("cactusMat", scene);
+                    cactusMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
+                    cactus.material = cactusMaterial;
+                    
+                    shadowGenerator.getShadowMap().renderList.push(cactus);
+                }
+                
+                // Swamp Witch's Hut
+                const swampHut = BABYLON.MeshBuilder.CreateBox("swampHut", {width: 4, height: 3, depth: 4}, scene);
+                swampHut.position.set(-35, 1.5, -25);
+                const hutMaterial = new BABYLON.StandardMaterial("hutMat", scene);
+                hutMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.1);
+                hutMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.05, 0.02);
+                swampHut.material = hutMaterial;
+                
+                // Mystical Tower
+                const tower = BABYLON.MeshBuilder.CreateCylinder("mysticalTower", {height: 8, diameter: 3}, scene);
+                tower.position.set(5, 4, 5);
+                const towerMaterial = new BABYLON.StandardMaterial("towerMat", scene);
+                towerMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.6);
+                tower.material = towerMaterial;
+                
+                const towerRoof = BABYLON.MeshBuilder.CreateCylinder("towerRoof", {
+                    height: 2, diameterTop: 0.5, diameterBottom: 3.5
+                }, scene);
+                towerRoof.position.set(5, 9, 5);
+                const roofMaterial = new BABYLON.StandardMaterial("roofMat", scene);
+                roofMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.1, 0.1);
+                towerRoof.material = roofMaterial;
+                
+                // Magical crystal on tower
+                const crystal = BABYLON.MeshBuilder.CreateBox("crystal", {width: 0.5, height: 1, depth: 0.5}, scene);
+                crystal.position.set(5, 10.5, 5);
+                crystal.rotation.y = Math.PI / 4;
+                const crystalMaterial = new BABYLON.StandardMaterial("crystalMat", scene);
+                crystalMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.3, 1);
+                crystalMaterial.emissiveColor = new BABYLON.Color3(0.4, 0.1, 0.5);
+                crystal.material = crystalMaterial;
+                
+                // Animate crystal
+                const crystalRotationAnim = new BABYLON.Animation("crystalRotation", "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                const crystalRotationKeys = [];
+                crystalRotationKeys.push({frame: 0, value: 0});
+                crystalRotationKeys.push({frame: 30, value: Math.PI * 2});
+                crystalRotationAnim.setKeys(crystalRotationKeys);
+                
+                const crystalFloatAnim = new BABYLON.Animation("crystalFloat", "position.y", 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                const crystalFloatKeys = [];
+                crystalFloatKeys.push({frame: 0, value: 10.5});
+                crystalFloatKeys.push({frame: 30, value: 10.8});
+                crystalFloatKeys.push({frame: 60, value: 10.5});
+                crystalFloatAnim.setKeys(crystalFloatKeys);
+                
+                crystal.animations = [crystalRotationAnim, crystalFloatAnim];
+                scene.beginAnimation(crystal, 0, 30, true);
+                scene.beginAnimation(crystal, 0, 60, true);
+                
+                shadowGenerator.getShadowMap().renderList.push(swampHut, tower, towerRoof);
+                
+                updateLoadingProgress("Creating magical lighting effects...");
+                
+                // Region-specific lights
+                const crystalLight = new BABYLON.PointLight("crystalLight", new BABYLON.Vector3(5, 10.5, 5), scene);
+                crystalLight.diffuse = new BABYLON.Color3(0.8, 0.3, 1);
+                crystalLight.intensity = 2;
+                crystalLight.range = 15;
+                
+                const swampLight = new BABYLON.PointLight("swampLight", new BABYLON.Vector3(-35, 2, -25), scene);
+                swampLight.diffuse = new BABYLON.Color3(0.3, 0.6, 0.2);
+                swampLight.intensity = 1.5;
+                swampLight.range = 12;
+                
+                const desertLight = new BABYLON.PointLight("desertLight", new BABYLON.Vector3(30, 3, -25), scene);
+                desertLight.diffuse = new BABYLON.Color3(1, 0.7, 0.4);
+                desertLight.intensity = 1.2;
+                desertLight.range = 20;
+                
+                updateLoadingProgress("Adding magical particle effects...");
+                
+                // Create simple particle texture
+                function createParticleTexture() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+                    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+                    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, 64, 64);
+                    return new BABYLON.Texture(canvas.toDataURL(), scene);
+                }
+                
+                const particleTexture = createParticleTexture();
+                
+                // Crystal particles
+                const crystalParticles = new BABYLON.ParticleSystem("crystalParticles", 1000, scene);
+                crystalParticles.particleTexture = particleTexture;
+                crystalParticles.emitter = crystal;
+                crystalParticles.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
+                crystalParticles.maxEmitBox = new BABYLON.Vector3(0.5, 0, 0.5);
+                crystalParticles.color1 = new BABYLON.Color4(0.8, 0.2, 1.0, 1.0);
+                crystalParticles.color2 = new BABYLON.Color4(1.0, 0.4, 0.8, 1.0);
+                crystalParticles.colorDead = new BABYLON.Color4(0, 0, 0.2, 0.0);
+                crystalParticles.minSize = 0.1;
+                crystalParticles.maxSize = 0.5;
+                crystalParticles.minLifeTime = 1.0;
+                crystalParticles.maxLifeTime = 3.0;
+                crystalParticles.emitRate = 100;
+                crystalParticles.minEmitPower = 1;
+                crystalParticles.maxEmitPower = 3;
+                crystalParticles.updateSpeed = 0.005;
+                crystalParticles.gravity = new BABYLON.Vector3(0, -9.81, 0);
+                crystalParticles.direction1 = new BABYLON.Vector3(-1, 8, -1);
+                crystalParticles.direction2 = new BABYLON.Vector3(1, 8, 1);
+                crystalParticles.start();
+                
+                updateLoadingProgress("Setting up enhanced controls...");
+                
+                // Input handling
+                const keys = {};
+                let isWalking = false;
+                let walkingAnimation = null;
+                
+                document.addEventListener('keydown', function(event) {
+                    keys[event.code] = true;
+                    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+                        event.preventDefault();
+                    }
+                });
+                
+                document.addEventListener('keyup', function(event) {
+                    keys[event.code] = false;
+                });
+                
+                // Walking animation
+                function createWalkingAnimation() {
+                    const animationGroup = new BABYLON.AnimationGroup("walkAnimation");
+                    
+                    const bobAnimation = new BABYLON.Animation("playerBob", "position.y", 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                    const bobKeys = [];
+                    bobKeys.push({frame: 0, value: 0});
+                    bobKeys.push({frame: 15, value: 0.1});
+                    bobKeys.push({frame: 30, value: 0});
+                    bobKeys.push({frame: 45, value: 0.1});
+                    bobKeys.push({frame: 60, value: 0});
+                    bobAnimation.setKeys(bobKeys);
+                    
+                    const swayAnimation = new BABYLON.Animation("playerSway", "rotation.z", 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                    const swayKeys = [];
+                    swayKeys.push({frame: 0, value: 0});
+                    swayKeys.push({frame: 30, value: 0.05});
+                    swayKeys.push({frame: 60, value: 0});
+                    swayAnimation.setKeys(swayKeys);
+                    
+                    animationGroup.addTargetedAnimation(bobAnimation, player);
+                    animationGroup.addTargetedAnimation(swayAnimation, player);
+                    
+                    return animationGroup;
+                }
+                
+                walkingAnimation = createWalkingAnimation();
+                
+                // Game loop
+                scene.registerBeforeRender(function() {
+                    const speed = 0.2;
+                    let moved = false;
+                    
+                    if (keys['KeyW'] || keys['ArrowUp']) {
+                        player.position.z += speed;
+                        moved = true;
+                    }
+                    if (keys['KeyS'] || keys['ArrowDown']) {
+                        player.position.z -= speed;
+                        moved = true;
+                    }
+                    if (keys['KeyA'] || keys['ArrowLeft']) {
+                        player.position.x -= speed;
+                        moved = true;
+                    }
+                    if (keys['KeyD'] || keys['ArrowRight']) {
+                        player.position.x += speed;
+                        moved = true;
+                    }
+                    
+                    if (keys['Space']) {
+                        keys['Space'] = false;
+                        checkInteractions();
+                    }
+                    
+                    // Handle walking animations
+                    if (moved && !isWalking) {
+                        isWalking = true;
+                        walkingAnimation.play(true);
+                    } else if (!moved && isWalking) {
+                        isWalking = false;
+                        walkingAnimation.stop();
+                        player.position.y = 0;
+                        player.rotation.z = 0;
+                    }
+                    
+                    if (moved) {
+                        // Keep within bounds
+                        player.position.x = Math.max(-45, Math.min(45, player.position.x));
+                        player.position.z = Math.max(-45, Math.min(45, player.position.z));
+                        
+                        // Smooth camera following
+                        if (!isMouseDown) {
+                            const targetCameraPos = new BABYLON.Vector3(
+                                player.position.x + Math.sin(alpha) * distance,
+                                10,
+                                player.position.z + Math.cos(alpha) * distance
+                            );
+                            camera.position = BABYLON.Vector3.Lerp(camera.position, targetCameraPos, 0.05);
+                            camera.setTarget(player.position);
+                        }
+                        
+                        updateUI();
+                    }
+                });
+                
+                function checkInteractions() {
+                    const x = player.position.x;
+                    const z = player.position.z;
+                    
+                    if (Math.abs(x + 35) < 4 && Math.abs(z + 25) < 4) {
+                        updateStatus("Discovered the Witch's Hut! Mystical energies swirl around you...");
+                        return;
+                    }
+                    
+                    if (Math.abs(x - 5) < 4 && Math.abs(z - 5) < 4) {
+                        updateStatus("The Mystical Tower pulses with ancient magic! Knowledge awaits...");
+                        return;
+                    }
+                    
+                    updateStatus("Exploring the realm...");
+                }
+                
+                function updateUI() {
+                    const posElement = document.getElementById('playerPos');
+                    if (posElement) {
+                        posElement.textContent = Math.round(player.position.x) + ', ' + Math.round(player.position.z);
+                    }
+                    updateRegion();
+                }
+                
+                function updateStatus(text) {
+                    const statusElement = document.getElementById('gameStatus');
+                    if (statusElement) {
+                        statusElement.textContent = text;
+                    }
+                }
+                
+                function updateRegion() {
+                    const x = player.position.x;
+                    const z = player.position.z;
+                    let region = "Central Plains";
+                    
+                    if (x < -25 && z > 10) region = "🌲 Whispering Woods";
+                    else if (x > 20 && z < -15) region = "🏜️ Golden Desert";
+                    else if (x < -25 && z < -15) region = "🐸 Shadowmere Swamp";
+                    else if (Math.abs(x - 5) < 10 && Math.abs(z - 5) < 10) region = "🏰 Mystical Tower Area";
+                    
+                    const regionElement = document.getElementById('playerRegion');
+                    if (regionElement) {
+                        regionElement.textContent = region;
+                    }
+                }
+                
+                updateLoadingProgress("Optimizing performance...");
+                
+                // Add post-processing for enhanced visuals
+                const postProcess = new BABYLON.FxaaPostProcess("fxaa", 1.0, camera);
+                postProcess.samples = 4;
+                
+                updateLoadingProgress("Starting game world...");
+                
+                // Start render loop
+                engine.runRenderLoop(function() {
+                    scene.render();
+                });
+                
+                // Handle window resize
+                window.addEventListener("resize", function() {
+                    engine.resize();
+                });
+                
+                // Show the game
+                setTimeout(() => {
+                    console.log("🎮 Enhanced Britannia Reborn loaded successfully!");
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    document.getElementById('gameCanvas').style.display = 'block';
+                    document.getElementById('gameUI').style.display = 'block';
+                    
+                    canvas.focus();
+                    canvas.tabIndex = 0;
+                    
+                    updateStatus("Welcome to Enhanced Britannia! Begin your legendary quest...");
+                }, 1000);
+                
+            } catch (error) {
+                console.error("💥 Game initialization error:", error);
+                showError("Enhanced game initialization failed: " + error.message);
+            }
+        }
+        
+        // Start the enhanced game
+        window.addEventListener('load', function() {
+            console.log("📱 Page loaded, initializing Enhanced Britannia Reborn...");
+            setTimeout(loadBabylonJS, 100);
+        });
+        
+        // Handle page visibility for performance
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log("🔇 Game paused (tab hidden)");
+            } else {
+                console.log("🔊 Game resumed (tab visible)");
+            }
+        });
+    </script>
+</body>
+</html>
