@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Britannia Reborn - Enhanced Edition</title>
+    <title>Britannia Reborn - NPCs & Dialogue Edition</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
             background: #000;
-            font-family: Arial, sans-serif;
+            font-family: 'Courier New', monospace;
         }
         
         #gameCanvas {
@@ -32,6 +32,93 @@
             font-size: 14px;
             backdrop-filter: blur(5px);
             border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        #dialogueBox {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            max-width: 90vw;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #8B4513;
+            border-radius: 8px;
+            padding: 20px;
+            color: #FFD700;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            display: none;
+            z-index: 150;
+            box-shadow: 0 0 20px rgba(139, 69, 19, 0.5);
+        }
+        
+        #dialogueBox .npc-name {
+            color: #FFA500;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #8B4513;
+            padding-bottom: 5px;
+        }
+        
+        #dialogueBox .dialogue-text {
+            margin: 15px 0;
+            line-height: 1.4;
+            min-height: 60px;
+        }
+        
+        #dialogueBox .keywords {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #8B4513;
+        }
+        
+        #dialogueBox .keyword {
+            display: inline-block;
+            background: rgba(139, 69, 19, 0.7);
+            color: #FFD700;
+            padding: 5px 10px;
+            margin: 3px;
+            border-radius: 3px;
+            cursor: pointer;
+            border: 1px solid #8B4513;
+            transition: all 0.2s;
+        }
+        
+        #dialogueBox .keyword:hover {
+            background: rgba(139, 69, 19, 1);
+            color: #FFF;
+            transform: scale(1.05);
+        }
+        
+        #dialogueBox .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #FFD700;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            width: 25px;
+            height: 25px;
+        }
+        
+        #interactionHint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #FFD700;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            display: none;
+            z-index: 140;
+            border: 1px solid #8B4513;
         }
         
         #loadingScreen {
@@ -86,11 +173,26 @@
             border-bottom: none;
             margin-bottom: 0;
         }
+
+        .npc-indicator {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 215, 0, 0.9);
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            display: none;
+            z-index: 120;
+        }
     </style>
 </head>
 <body>
     <div id="loadingScreen">
-        <div>🏰 Loading Enhanced Britannia...</div>
+        <div>🏰 Loading Enhanced Britannia with NPCs...</div>
         <div class="loading-spinner"></div>
         <div id="loadingProgress">Initializing...</div>
     </div>
@@ -116,7 +218,8 @@
             <strong>Controls:</strong><br>
             WASD/Arrow Keys: Move<br>
             Mouse: Rotate Camera<br>
-            Space: Interact
+            Space: Interact/Talk<br>
+            ESC: Close Dialogue
         </div>
         <div class="ui-section">
             <strong>🗺️ Regions:</strong><br>
@@ -127,14 +230,143 @@
         </div>
     </div>
 
+    <div id="interactionHint">Press SPACE to talk</div>
+
+    <div id="dialogueBox">
+        <button class="close-btn" onclick="closeDialogue()">×</button>
+        <div class="npc-name" id="npcName">Unknown</div>
+        <div class="dialogue-text" id="dialogueText">...</div>
+        <div class="keywords" id="keywordContainer"></div>
+    </div>
+
     <script>
-        console.log("🏰 Starting Enhanced Britannia Reborn...");
+        console.log("🏰 Starting Enhanced Britannia Reborn with NPCs...");
+        
+        // Game state
+        let currentScene = null;
+        let currentNPC = null;
+        let gameNPCs = [];
+        let isDialogueOpen = false;
         
         // Block gamepad to prevent conflicts
         if (navigator.getGamepads) {
             navigator.getGamepads = function() { return []; };
             console.log("Gamepad API blocked for stability");
         }
+        
+        // NPC Database - Ultima-style characters
+        const NPCDatabase = {
+            'Guard Captain Marcus': {
+                name: 'Guard Captain Marcus',
+                job: 'Captain of the Royal Guard',
+                appearance: 'guard',
+                responses: {
+                    'name': "I am Marcus, Captain of the Royal Guard of Britannia.",
+                    'job': "My duty is to protect the realm and its people from all manner of threats. The roads have been dangerous lately.",
+                    'guard': "The Royal Guard maintains order throughout the realm. We patrol the roads and protect travelers.",
+                    'britannia': "Britannia is a land of magic and wonder, but also of great peril. Dark forces stir in the corners of our realm.",
+                    'threat': "Strange creatures have been seen near the Shadowmere Swamp. The Witch of the Marsh grows more bold each day.",
+                    'witch': "The Witch of the Marsh dwells in the swamp to the southwest. She practices dark magics and corrupts the land.",
+                    'tower': "The Mystical Tower holds ancient knowledge. The Sage who dwells there is wise but reclusive.",
+                    'sage': "Master Aldrich is the keeper of the tower's knowledge. He may aid thee if thy cause is just.",
+                    'bye': "Farewell, traveler. May thy path be safe and thy purpose true."
+                },
+                initialKeywords: ['name', 'job', 'britannia', 'threat']
+            },
+            
+            'Blacksmith Gareth': {
+                name: 'Blacksmith Gareth',
+                job: 'Master Blacksmith',
+                appearance: 'blacksmith',
+                responses: {
+                    'name': "I am Gareth, master of forge and flame. I craft the finest weapons and armor in all Britannia.",
+                    'job': "I work the forge day and night, shaping metal into tools of war and peace. Each piece bears my mark of quality.",
+                    'forge': "My forge burns with eternal flame, heated by magic crystals from the mystical tower. The fire never dies.",
+                    'weapon': "I can craft any blade thy heart desires, from simple daggers to mighty two-handed swords. Bring me the materials.",
+                    'armor': "Good armor can mean the difference between life and death. I craft only the finest mail and plate.",
+                    'crystal': "The magic crystals fuel my forge with supernatural heat. Without them, I could not craft such fine works.",
+                    'tower': "The Sage at the tower provides my crystals in exchange for specially crafted items. 'Tis a fair trade.",
+                    'material': "I need rare ores and gems to craft the best equipment. The desert caves hold precious stones.",
+                    'bye': "Farewell! May thy blade stay sharp and thy armor true."
+                },
+                initialKeywords: ['name', 'job', 'weapon', 'armor']
+            },
+            
+            'Innkeeper Sarah': {
+                name: 'Innkeeper Sarah',
+                job: 'Keeper of the Wanderer\'s Rest',
+                appearance: 'innkeeper',
+                responses: {
+                    'name': "I am Sarah, keeper of this humble inn. All travelers are welcome at the Wanderer's Rest.",
+                    'job': "I provide food, drink, and shelter to weary travelers. Mine inn is a safe haven in troubled times.",
+                    'inn': "The Wanderer's Rest has sheltered travelers for three generations. My grandmother built this place.",
+                    'food': "I serve hearty stew, fresh bread, and the finest ale in the realm. A good meal restores both body and spirit.",
+                    'room': "A warm bed and safe lodging cost but a few gold pieces. Rest well, for the road ahead is perilous.",
+                    'travel': "Many travelers pass through here. I hear tales from across the realm - some wondrous, others terrifying.",
+                    'news': "Word reaches me of strange happenings. Lights in the swamp, voices from the desert, magic in the woods.",
+                    'tale': "Old Theron the Merchant spoke of ruins in the forest. Ancient stones covered in mystical runes.",
+                    'bye': "Safe travels, friend. Remember, the Wanderer's Rest always has room for one more."
+                },
+                initialKeywords: ['name', 'job', 'food', 'news']
+            },
+            
+            'Sage Aldrich': {
+                name: 'Sage Aldrich',
+                job: 'Keeper of Ancient Knowledge',
+                appearance: 'sage',
+                responses: {
+                    'name': "I am Aldrich, guardian of the mystical arts and keeper of ancient wisdom.",
+                    'job': "I study the arcane mysteries of magic and maintain the great crystal that powers this tower.",
+                    'magic': "Magic flows through all things in Britannia. The crystal amplifies this power and focuses it for good.",
+                    'crystal': "The Great Crystal of Power was placed here by the ancient mages. It protects the realm from dark forces.",
+                    'ancient': "Long ago, powerful wizards built this tower as a beacon of light against the darkness. I continue their work.",
+                    'knowledge': "Within these walls lie scrolls and tomes containing centuries of magical learning. Knowledge is power.",
+                    'spell': "I can teach basic spells to those pure of heart. Magic must never be used for evil purposes.",
+                    'darkness': "Dark forces gather strength in the outer reaches. The witch's power grows, and evil stirs in forgotten places.",
+                    'wisdom': "True wisdom comes not from books alone, but from understanding the balance between light and shadow.",
+                    'bye': "Go in peace, seeker. May the light of knowledge guide thy path through the darkness ahead."
+                },
+                initialKeywords: ['name', 'job', 'magic', 'wisdom']
+            },
+            
+            'Witch Morgana': {
+                name: 'Witch Morgana',
+                job: 'Mistress of the Marsh',
+                appearance: 'witch',
+                responses: {
+                    'name': "I am Morgana, and these swamplands bow to my will. Few dare speak my name aloud.",
+                    'job': "I command the forces of nature and shadow. The marsh spirits are my servants, the mist my cloak.",
+                    'magic': "My magic is older than the tower sage's dusty tomes. I draw power from the earth itself.",
+                    'swamp': "This marsh is my domain. Every creature here serves me, every shadow obeys my command.",
+                    'power': "Power flows from understanding the true nature of things. The sage's light magic is but half the truth.",
+                    'shadow': "Shadow and light are two sides of the same coin. One cannot exist without the other.",
+                    'nature': "Nature is neither good nor evil - it simply is. I embrace all aspects of the natural world.",
+                    'sage': "Aldrich clings to his narrow view of magic. He fears what he does not understand.",
+                    'crystal': "His precious crystal is a crutch for the weak. True power comes from within.",
+                    'bye': "Leave my domain, but remember - nature has many faces, and not all are kind."
+                },
+                initialKeywords: ['name', 'job', 'magic', 'power']
+            },
+            
+            'Merchant Theron': {
+                name: 'Merchant Theron',
+                job: 'Traveling Trader',
+                appearance: 'merchant',
+                responses: {
+                    'name': "I am Theron, a humble merchant who travels the roads of Britannia seeking profit and adventure.",
+                    'job': "I buy and sell goods across the realm. Fine weapons, rare gems, magical reagents - I trade in all.",
+                    'trade': "Good business requires trust and fair dealing. I've built my reputation over many years of honest trade.",
+                    'goods': "I carry weapons from the city forges, gems from the desert mines, and herbs from the forest depths.",
+                    'gem': "The desert caves yield beautiful gems - rubies, sapphires, emeralds. Each worth a king's ransom.",
+                    'weapon': "Fine blades fetch good prices. The blacksmith Gareth crafts the best weapons I've ever seen.",
+                    'herb': "Magical herbs grow in the Whispering Woods. The wise know their properties and pay well for them.",
+                    'road': "The roads grow dangerous. I've seen strange creatures and unexplained lights. Bad for business.",
+                    'profit': "A wise merchant knows when to buy and when to sell. Information is often more valuable than gold.",
+                    'bye': "Farewell! If thou dost find any rare items in thy travels, remember old Theron will pay well."
+                },
+                initialKeywords: ['name', 'job', 'trade', 'goods']
+            }
+        };
         
         // Check WebGL support
         function checkWebGL() {
@@ -162,6 +394,60 @@
             console.error("❌ Game Error:", message);
         }
         
+        // Dialogue System Functions
+        function openDialogue(npc) {
+            currentNPC = npc;
+            isDialogueOpen = true;
+            
+            document.getElementById('dialogueBox').style.display = 'block';
+            document.getElementById('npcName').textContent = npc.data.name;
+            document.getElementById('dialogueText').textContent = `Greetings, traveler. I am ${npc.data.name}.`;
+            
+            showKeywords(npc.data.initialKeywords || ['name', 'job', 'bye']);
+            
+            // Hide interaction hint
+            document.getElementById('interactionHint').style.display = 'none';
+        }
+        
+        function closeDialogue() {
+            currentNPC = null;
+            isDialogueOpen = false;
+            document.getElementById('dialogueBox').style.display = 'none';
+        }
+        
+        function showKeywords(keywords) {
+            const container = document.getElementById('keywordContainer');
+            container.innerHTML = '';
+            
+            keywords.forEach(keyword => {
+                const btn = document.createElement('div');
+                btn.className = 'keyword';
+                btn.textContent = keyword.toUpperCase();
+                btn.onclick = () => speakKeyword(keyword);
+                container.appendChild(btn);
+            });
+        }
+        
+        function speakKeyword(keyword) {
+            if (!currentNPC || !currentNPC.data.responses[keyword]) {
+                document.getElementById('dialogueText').textContent = "I do not understand thy words.";
+                return;
+            }
+            
+            const response = currentNPC.data.responses[keyword];
+            document.getElementById('dialogueText').textContent = response;
+            
+            // Show related keywords based on response content
+            const allKeywords = Object.keys(currentNPC.data.responses);
+            const relatedKeywords = allKeywords.filter(k => {
+                return response.toLowerCase().includes(k) || k === 'bye';
+            });
+            
+            // Always include bye and add some random relevant keywords
+            const keywordsToShow = [...new Set([...relatedKeywords, 'bye'])].slice(0, 6);
+            showKeywords(keywordsToShow);
+        }
+        
         function loadBabylonJS() {
             updateLoadingProgress("Checking WebGL support...");
             
@@ -172,7 +458,6 @@
             
             updateLoadingProgress("Loading enhanced 3D engine...");
             
-            // Use updated Babylon.js with fallback
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.33.1/babylon.min.js';
             
@@ -203,6 +488,150 @@
             document.head.appendChild(script);
         }
         
+        function createNPC(scene, name, position, shadowGenerator) {
+            const npcData = NPCDatabase[name];
+            if (!npcData) return null;
+            
+            // Create NPC container
+            const npc = new BABYLON.Mesh(`npc_${name}`, scene);
+            npc.position = position;
+            npc.data = npcData;
+            
+            // Create NPC appearance based on type
+            let bodyColor, headColor, accessoryColor;
+            switch (npcData.appearance) {
+                case 'guard':
+                    bodyColor = new BABYLON.Color3(0.3, 0.3, 0.7); // Blue armor
+                    headColor = new BABYLON.Color3(0.8, 0.7, 0.6); // Skin
+                    accessoryColor = new BABYLON.Color3(0.6, 0.6, 0.7); // Silver helmet
+                    break;
+                case 'blacksmith':
+                    bodyColor = new BABYLON.Color3(0.4, 0.2, 0.1); // Brown leather
+                    headColor = new BABYLON.Color3(0.9, 0.7, 0.5); // Tanned skin
+                    accessoryColor = new BABYLON.Color3(0.2, 0.2, 0.2); // Black apron
+                    break;
+                case 'innkeeper':
+                    bodyColor = new BABYLON.Color3(0.6, 0.4, 0.2); // Brown dress
+                    headColor = new BABYLON.Color3(0.9, 0.8, 0.7); // Fair skin
+                    accessoryColor = new BABYLON.Color3(0.8, 0.8, 0.9); // White apron
+                    break;
+                case 'sage':
+                    bodyColor = new BABYLON.Color3(0.2, 0.1, 0.4); // Purple robes
+                    headColor = new BABYLON.Color3(0.9, 0.9, 0.9); // Pale skin
+                    accessoryColor = new BABYLON.Color3(0.8, 0.7, 0.3); // Golden staff
+                    break;
+                case 'witch':
+                    bodyColor = new BABYLON.Color3(0.1, 0.1, 0.1); // Black robes
+                    headColor = new BABYLON.Color3(0.7, 0.8, 0.7); // Pale green skin
+                    accessoryColor = new BABYLON.Color3(0.2, 0.4, 0.1); // Dark green hood
+                    break;
+                case 'merchant':
+                    bodyColor = new BABYLON.Color3(0.6, 0.3, 0.1); // Rich brown
+                    headColor = new BABYLON.Color3(0.8, 0.6, 0.4); // Merchant tan
+                    accessoryColor = new BABYLON.Color3(0.8, 0.6, 0.2); // Gold trim
+                    break;
+                default:
+                    bodyColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+                    headColor = new BABYLON.Color3(0.8, 0.7, 0.6);
+                    accessoryColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+            }
+            
+            // Create materials
+            const bodyMaterial = new BABYLON.StandardMaterial(`${name}_body`, scene);
+            bodyMaterial.diffuseColor = bodyColor;
+            bodyMaterial.freeze();
+            
+            const headMaterial = new BABYLON.StandardMaterial(`${name}_head`, scene);
+            headMaterial.diffuseColor = headColor;
+            headMaterial.freeze();
+            
+            const accessoryMaterial = new BABYLON.StandardMaterial(`${name}_accessory`, scene);
+            accessoryMaterial.diffuseColor = accessoryColor;
+            accessoryMaterial.freeze();
+            
+            // Create NPC body parts
+            const head = BABYLON.MeshBuilder.CreateSphere(`${name}_head`, {diameter: 0.8}, scene);
+            head.position.y = 2.6;
+            head.parent = npc;
+            head.material = headMaterial;
+            
+            const body = BABYLON.MeshBuilder.CreateCylinder(`${name}_body`, {height: 1.5, diameter: 0.8}, scene);
+            body.position.y = 1.5;
+            body.parent = npc;
+            body.material = bodyMaterial;
+            
+            const leftArm = BABYLON.MeshBuilder.CreateCylinder(`${name}_leftArm`, {height: 1.2, diameter: 0.25}, scene);
+            leftArm.position.set(-0.6, 1.8, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            leftArm.parent = npc;
+            leftArm.material = headMaterial;
+            
+            const rightArm = BABYLON.MeshBuilder.CreateCylinder(`${name}_rightArm`, {height: 1.2, diameter: 0.25}, scene);
+            rightArm.position.set(0.6, 1.8, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            rightArm.parent = npc;
+            rightArm.material = headMaterial;
+            
+            const leftLeg = BABYLON.MeshBuilder.CreateCylinder(`${name}_leftLeg`, {height: 1.4, diameter: 0.3}, scene);
+            leftLeg.position.set(-0.25, 0.7, 0);
+            leftLeg.parent = npc;
+            leftLeg.material = bodyMaterial;
+            
+            const rightLeg = BABYLON.MeshBuilder.CreateCylinder(`${name}_rightLeg`, {height: 1.4, diameter: 0.3}, scene);
+            rightLeg.position.set(0.25, 0.7, 0);
+            rightLeg.parent = npc;
+            rightLeg.material = bodyMaterial;
+            
+            // Add character-specific accessories
+            if (npcData.appearance === 'guard') {
+                const helmet = BABYLON.MeshBuilder.CreateSphere(`${name}_helmet`, {diameter: 0.9}, scene);
+                helmet.position.y = 2.7;
+                helmet.scaling.y = 0.8;
+                helmet.parent = npc;
+                helmet.material = accessoryMaterial;
+                
+                const sword = BABYLON.MeshBuilder.CreateCylinder(`${name}_sword`, {height: 0.8, diameter: 0.05}, scene);
+                sword.position.set(0.4, 1.2, -0.2);
+                sword.rotation.z = -Math.PI / 4;
+                sword.parent = npc;
+                sword.material = accessoryMaterial;
+            } else if (npcData.appearance === 'sage') {
+                const hat = BABYLON.MeshBuilder.CreateCylinder(`${name}_hat`, {height: 0.8, diameterTop: 0.2, diameterBottom: 0.6}, scene);
+                hat.position.y = 3.2;
+                hat.parent = npc;
+                hat.material = accessoryMaterial;
+                
+                const staff = BABYLON.MeshBuilder.CreateCylinder(`${name}_staff`, {height: 2.5, diameter: 0.05}, scene);
+                staff.position.set(0.7, 1.8, 0);
+                staff.parent = npc;
+                staff.material = accessoryMaterial;
+            } else if (npcData.appearance === 'witch') {
+                const hood = BABYLON.MeshBuilder.CreateSphere(`${name}_hood`, {diameter: 1.2}, scene);
+                hood.position.y = 2.8;
+                hood.scaling.y = 0.6;
+                hood.parent = npc;
+                hood.material = accessoryMaterial;
+            }
+            
+            // Add to shadows
+            shadowGenerator.getShadowMap().renderList.push(npc, head, body);
+            
+            // Simple idle animation
+            const idleAnimation = new BABYLON.Animation(`${name}_idle`, "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+            const idleKeys = [];
+            idleKeys.push({frame: 0, value: 0});
+            idleKeys.push({frame: 90, value: Math.PI / 4});
+            idleKeys.push({frame: 180, value: 0});
+            idleKeys.push({frame: 270, value: -Math.PI / 4});
+            idleKeys.push({frame: 360, value: 0});
+            idleAnimation.setKeys(idleKeys);
+            npc.animations = [idleAnimation];
+            scene.beginAnimation(npc, 0, 360, true);
+            
+            gameNPCs.push(npc);
+            return npc;
+        }
+        
         function initializeEnhancedGame() {
             try {
                 updateLoadingProgress("Initializing enhanced 3D world...");
@@ -229,6 +658,7 @@
                 
                 updateLoadingProgress("Creating enhanced scene...");
                 const scene = new BABYLON.Scene(engine);
+                currentScene = scene;
                 scene.clearColor = new BABYLON.Color3(0.2, 0.4, 0.6);
                 scene.fogEnabled = false;
                 scene.autoClear = true;
@@ -246,7 +676,7 @@
                 let distance = 15;
                 
                 canvas.addEventListener('mousedown', function(event) {
-                    if (event.button === 0) {
+                    if (event.button === 0 && !isDialogueOpen) {
                         isMouseDown = true;
                         lastMouseX = event.clientX;
                         lastMouseY = event.clientY;
@@ -266,7 +696,7 @@
                 });
                 
                 canvas.addEventListener('mousemove', function(event) {
-                    if (isMouseDown) {
+                    if (isMouseDown && !isDialogueOpen) {
                         const deltaX = event.clientX - lastMouseX;
                         const deltaY = event.clientY - lastMouseY;
                         
@@ -465,6 +895,16 @@
                 // Add to shadows
                 shadowGenerator.getShadowMap().renderList.push(player, head, helmet, torso, cape, sword, shield);
                 
+                updateLoadingProgress("Creating NPCs throughout the realm...");
+                
+                // Create NPCs in various locations
+                createNPC(scene, 'Guard Captain Marcus', new BABYLON.Vector3(2, 0, 2), shadowGenerator);
+                createNPC(scene, 'Blacksmith Gareth', new BABYLON.Vector3(-8, 0, 3), shadowGenerator);
+                createNPC(scene, 'Innkeeper Sarah', new BABYLON.Vector3(8, 0, -5), shadowGenerator);
+                createNPC(scene, 'Sage Aldrich', new BABYLON.Vector3(5, 0, 8), shadowGenerator);
+                createNPC(scene, 'Witch Morgana', new BABYLON.Vector3(-35, 0, -25), shadowGenerator);
+                createNPC(scene, 'Merchant Theron', new BABYLON.Vector3(-2, 0, -8), shadowGenerator);
+                
                 updateLoadingProgress("Building mystical structures...");
                 
                 // Forest trees
@@ -617,11 +1057,17 @@
                 const keys = {};
                 let isWalking = false;
                 let walkingAnimation = null;
+                let nearestNPC = null;
                 
                 document.addEventListener('keydown', function(event) {
                     keys[event.code] = true;
-                    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+                    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Escape'].includes(event.code)) {
                         event.preventDefault();
+                    }
+                    
+                    // Handle dialogue controls
+                    if (event.code === 'Escape' && isDialogueOpen) {
+                        closeDialogue();
                     }
                 });
                 
@@ -659,6 +1105,8 @@
                 
                 // Game loop
                 scene.registerBeforeRender(function() {
+                    if (isDialogueOpen) return; // Don't process movement during dialogue
+                    
                     const speed = 0.2;
                     let moved = false;
                     
@@ -713,23 +1161,54 @@
                         
                         updateUI();
                     }
+                    
+                    // Check for nearby NPCs
+                    checkNearbyNPCs();
                 });
+                
+                function checkNearbyNPCs() {
+                    nearestNPC = null;
+                    let closestDistance = 5; // Maximum interaction distance
+                    
+                    gameNPCs.forEach(npc => {
+                        const distance = BABYLON.Vector3.Distance(player.position, npc.position);
+                        if (distance < closestDistance) {
+                            nearestNPC = npc;
+                            closestDistance = distance;
+                        }
+                    });
+                    
+                    const hintElement = document.getElementById('interactionHint');
+                    if (nearestNPC && !isDialogueOpen) {
+                        hintElement.textContent = `Press SPACE to talk to ${nearestNPC.data.name}`;
+                        hintElement.style.display = 'block';
+                    } else {
+                        hintElement.style.display = 'none';
+                    }
+                }
                 
                 function checkInteractions() {
                     const x = player.position.x;
                     const z = player.position.z;
                     
+                    // Check for NPC interactions first
+                    if (nearestNPC) {
+                        openDialogue(nearestNPC);
+                        return;
+                    }
+                    
+                    // Check for building interactions
                     if (Math.abs(x + 35) < 4 && Math.abs(z + 25) < 4) {
-                        updateStatus("Discovered the Witch's Hut! Mystical energies swirl around you...");
+                        updateStatus("You see the Witch's Hut. Dark magic emanates from within...");
                         return;
                     }
                     
                     if (Math.abs(x - 5) < 4 && Math.abs(z - 5) < 4) {
-                        updateStatus("The Mystical Tower pulses with ancient magic! Knowledge awaits...");
+                        updateStatus("The Mystical Tower stands before you, crystal light dancing above...");
                         return;
                     }
                     
-                    updateStatus("Exploring the realm...");
+                    updateStatus("Nothing of interest here...");
                 }
                 
                 function updateUI() {
@@ -783,7 +1262,7 @@
                 
                 // Show the game
                 setTimeout(() => {
-                    console.log("🎮 Enhanced Britannia Reborn loaded successfully!");
+                    console.log("🎮 Enhanced Britannia Reborn with NPCs loaded successfully!");
                     document.getElementById('loadingScreen').style.display = 'none';
                     document.getElementById('gameCanvas').style.display = 'block';
                     document.getElementById('gameUI').style.display = 'block';
@@ -791,7 +1270,7 @@
                     canvas.focus();
                     canvas.tabIndex = 0;
                     
-                    updateStatus("Welcome to Enhanced Britannia! Begin your legendary quest...");
+                    updateStatus("Welcome to Britannia! Seek out the inhabitants and learn their stories...");
                 }, 1000);
                 
             } catch (error) {
@@ -802,7 +1281,7 @@
         
         // Start the enhanced game
         window.addEventListener('load', function() {
-            console.log("📱 Page loaded, initializing Enhanced Britannia Reborn...");
+            console.log("📱 Page loaded, initializing Enhanced Britannia Reborn with NPCs...");
             setTimeout(loadBabylonJS, 100);
         });
         
