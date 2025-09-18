@@ -1056,7 +1056,8 @@
                 }
 
                 function updateCameraTarget() {
-                    BABYLON.Vector3.AddToRef(player.position, cameraTargetOffset, cameraTarget);
+                    cameraTarget.copyFrom(player.position);
+                    cameraTarget.addInPlace(cameraTargetOffset);
                     camera.setTarget(cameraTarget);
                 }
 
