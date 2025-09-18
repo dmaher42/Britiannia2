@@ -812,9 +812,9 @@
                 scene.autoClear = true;
                 scene.autoClearDepthAndStencil = true;
                 scene.imageProcessingConfiguration.toneMappingEnabled = true;
-                scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-                scene.imageProcessingConfiguration.exposure = 1.05;
-                scene.imageProcessingConfiguration.contrast = 1.1;
+                scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
+                scene.imageProcessingConfiguration.exposure = 1.3;
+                scene.imageProcessingConfiguration.contrast = 1.0;
                 
                 updateLoadingProgress("Setting up enhanced camera system...");
                 const defaultCameraHeight = 15;
@@ -874,11 +874,11 @@
                 
                 // Enhanced lighting system
                 const ambientLight = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0), scene);
-                ambientLight.intensity = 0.6;
+                ambientLight.intensity = 1.0;
                 ambientLight.diffuse = new BABYLON.Color3(0.8, 0.9, 1.0);
-                
+
                 const sunLight = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-1, -1, -1), scene);
-                sunLight.intensity = 0.8;
+                sunLight.intensity = 1.4;
                 sunLight.diffuse = new BABYLON.Color3(1, 0.95, 0.8);
                 
                 // Enhanced shadows
