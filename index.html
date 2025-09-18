@@ -764,15 +764,21 @@
                 }
                 
                 console.log("✅ Creating enhanced Babylon engine...");
-                const engine = new BABYLON.Engine(canvas, true, { 
+                const engine = new BABYLON.Engine(canvas, true, {
                     antialias: true,
                     powerPreference: "high-performance",
                     stencil: true,
                     preserveDrawingBuffer: true,
                     alpha: false
                 });
-                
-                engine.setHardwareScalingLevel(1.0);
+
+                const applyHardwareScaling = () => {
+                    const pixelRatio = window.devicePixelRatio || 1;
+                    const scalingLevel = Math.min(1, 1 / pixelRatio);
+                    engine.setHardwareScalingLevel(scalingLevel);
+                };
+
+                applyHardwareScaling();
                 
                 updateLoadingProgress("Creating enhanced scene...");
                 const scene = new BABYLON.Scene(engine);
@@ -1378,6 +1384,7 @@
                 // Handle window resize
                 window.addEventListener("resize", function() {
                     engine.resize();
+                    applyHardwareScaling();
                 });
                 
                 // Show the game
