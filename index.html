@@ -31,7 +31,6 @@
             z-index: 100;
             font-size: 13px;
             line-height: 1.35;
-            backdrop-filter: blur(6px);
             border: 1px solid rgba(255, 255, 255, 0.12);
             width: min(260px, 28vw);
             max-height: calc(100vh - 40px);
@@ -762,27 +761,44 @@
                 if (!canvas) {
                     throw new Error("Canvas element not found");
                 }
+
+                // Ensure the canvas has layout size even while hidden behind the loading screen
+                canvas.style.display = 'block';
+                canvas.style.visibility = 'hidden';
                 
                 console.log("✅ Creating enhanced Babylon engine...");
                 const engine = new BABYLON.Engine(canvas, true, {
                     antialias: true,
                     powerPreference: "high-performance",
                     stencil: true,
-                    preserveDrawingBuffer: true,
                     alpha: false
                 });
 
                 const applyHardwareScaling = () => {
-                    const pixelRatio = window.devicePixelRatio || 1;
-                    const desiredQuality = Math.max(pixelRatio, 1.5);
-                    const caps = engine.getCaps ? engine.getCaps() : null;
-                    const maxQuality = caps && caps.maxMSAASamples > 1 ? 2.5 : 2.0;
-                    const effectiveRatio = Math.min(desiredQuality, maxQuality);
-                    engine.setHardwareScalingLevel(1 / effectiveRatio);
-
                     const renderingCanvas = engine.getRenderingCanvas();
-                    if (renderingCanvas) {
-                        renderingCanvas.style.imageRendering = 'auto';
+                    if (!renderingCanvas) {
+                        return;
+                    }
+
+                    const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+                    const cssWidth = renderingCanvas.clientWidth;
+                    const cssHeight = renderingCanvas.clientHeight;
+                    const clientWidth = cssWidth || window.innerWidth || renderingCanvas.width || 1;
+                    const clientHeight = cssHeight || window.innerHeight || renderingCanvas.height || 1;
+                    const targetWidth = Math.max(1, Math.floor(clientWidth * pixelRatio));
+                    const targetHeight = Math.max(1, Math.floor(clientHeight * pixelRatio));
+
+                    if (renderingCanvas.width !== targetWidth) {
+                        renderingCanvas.width = targetWidth;
+                    }
+                    if (renderingCanvas.height !== targetHeight) {
+                        renderingCanvas.height = targetHeight;
+                    }
+
+                    engine.setHardwareScalingLevel(1 / pixelRatio);
+                    renderingCanvas.style.imageRendering = 'auto';
+                    if (cssWidth && cssHeight) {
+                        engine.resize();
                     }
                 };
 
@@ -1383,16 +1399,13 @@
                 updateLoadingProgress("Optimizing performance...");
                 updateLoadingProgress("Enhancing visual clarity...");
 
-                // Add post-processing for enhanced visuals
-                const fxaaPostProcess = new BABYLON.FxaaPostProcess("fxaa", 1.0, camera);
-                fxaaPostProcess.samples = 4;
-
+                // Skip FXAA to preserve native sharpness; add optional sharpening when available
                 if (BABYLON.SharpenPostProcess) {
                     const sharpenPostProcess = new BABYLON.SharpenPostProcess("sharpen", 1.0, camera);
-                    sharpenPostProcess.edgeAmount = 0.45;
-                    sharpenPostProcess.colorAmount = 0.25;
+                    sharpenPostProcess.edgeAmount = 0.35;
+                    sharpenPostProcess.colorAmount = 0.2;
                 } else {
-                    console.warn("Sharpen post-process not available in this build of Babylon.js.");
+                    console.info("Running without additional post-processing. Include the sharpen module if needed.");
                 }
                 
                 updateLoadingProgress("Starting game world...");
@@ -1404,7 +1417,6 @@
                 
                 // Handle window resize
                 window.addEventListener("resize", function() {
-                    engine.resize();
                     applyHardwareScaling();
                 });
                 
@@ -1413,10 +1425,12 @@
                     console.log("🎮 Enhanced Britannia Reborn with NPCs loaded successfully!");
                     document.getElementById('loadingScreen').style.display = 'none';
                     document.getElementById('gameCanvas').style.display = 'block';
+                    document.getElementById('gameCanvas').style.visibility = 'visible';
                     document.getElementById('gameUI').style.display = 'block';
-                    
-                    canvas.focus();
+
+                    applyHardwareScaling();
                     canvas.tabIndex = 0;
+                    canvas.focus();
                     
                     updateStatus("Welcome to Britannia! Seek out the inhabitants and learn their stories...");
                 }, 1000);
