@@ -826,8 +826,12 @@
                 let isMouseDown = false;
                 let lastMouseX = 0;
                 let lastMouseY = 0;
-                let alpha = 0;
+                let alpha = Math.PI;
                 let distance = defaultCameraDistance;
+                let currentCameraHeight = defaultCameraHeight;
+                const cameraTargetOffset = new BABYLON.Vector3(0, 2.8, 0);
+                const cameraTarget = new BABYLON.Vector3();
+                const desiredCameraPosition = new BABYLON.Vector3();
                 
                 canvas.addEventListener('mousedown', function(event) {
                     if (event.button === 0 && !isDialogueOpen) {
@@ -855,13 +859,10 @@
                         const deltaY = event.clientY - lastMouseY;
                         
                         alpha += deltaX * 0.008;
-                        
-                        camera.position.x = player.position.x + Math.sin(alpha) * distance;
-                        camera.position.z = player.position.z + Math.cos(alpha) * distance;
-                        camera.position.y = Math.max(8, Math.min(25, defaultCameraHeight + deltaY * 0.01));
-                        
-                        camera.setTarget(player.position);
-                        
+                        currentCameraHeight = Math.max(8, Math.min(25, currentCameraHeight + deltaY * 0.04));
+
+                        syncCameraToPlayer();
+
                         lastMouseX = event.clientX;
                         lastMouseY = event.clientY;
                     }
@@ -1043,9 +1044,31 @@
                 auraRotation.setKeys(auraKeys);
                 aura.animations = [auraRotation];
                 scene.beginAnimation(aura, 0, 30, true);
-                
+
                 player.position.y = 0;
-                
+
+                function computeDesiredCameraPosition() {
+                    desiredCameraPosition.set(
+                        player.position.x + Math.sin(alpha) * distance,
+                        currentCameraHeight,
+                        player.position.z + Math.cos(alpha) * distance
+                    );
+                }
+
+                function updateCameraTarget() {
+                    BABYLON.Vector3.AddToRef(player.position, cameraTargetOffset, cameraTarget);
+                    camera.setTarget(cameraTarget);
+                }
+
+                function syncCameraToPlayer() {
+                    computeDesiredCameraPosition();
+                    camera.position.copyFrom(desiredCameraPosition);
+                    updateCameraTarget();
+                }
+
+                // Align camera once the player is constructed
+                syncCameraToPlayer();
+
                 // Add to shadows
                 shadowGenerator.getShadowMap().renderList.push(player, head, helmet, torso, cape, sword, shield);
                 
@@ -1304,20 +1327,19 @@
                         
                         // Smooth camera following
                         if (!isMouseDown) {
-                            const targetCameraPos = new BABYLON.Vector3(
-                                player.position.x + Math.sin(alpha) * distance,
-                                defaultCameraHeight,
-                                player.position.z + Math.cos(alpha) * distance
-                            );
-                            camera.position = BABYLON.Vector3.Lerp(camera.position, targetCameraPos, 0.05);
-                            camera.setTarget(player.position);
+                            computeDesiredCameraPosition();
+                            BABYLON.Vector3.LerpToRef(camera.position, desiredCameraPosition, 0.06, camera.position);
                         }
-                        
+                        updateCameraTarget();
+
                         updateUI();
                     }
-                    
+
                     // Check for nearby NPCs
                     checkNearbyNPCs();
+                    if (!moved) {
+                        updateCameraTarget();
+                    }
                 });
                 
                 function checkNearbyNPCs() {
