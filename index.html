@@ -9,15 +9,22 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #000;
+            background: #0b0f1a;
             font-family: 'Courier New', monospace;
+            color-scheme: dark;
         }
-        
+
         #gameCanvas {
             width: 100%;
             height: 100vh;
             display: block;
             outline: none;
+            background-color: #000;
+            filter: none !important;
+            mix-blend-mode: normal;
+            image-rendering: auto;
+            opacity: 1;
+            touch-action: none;
         }
         
         #gameUI {
@@ -102,6 +109,25 @@
         .ui-content {
             display: grid;
             gap: 8px;
+        }
+
+        .ui-slider {
+            display: grid;
+            gap: 4px;
+        }
+
+        .ui-slider label {
+            font-size: 12px;
+            letter-spacing: 0.02em;
+        }
+
+        .ui-slider input[type="range"] {
+            width: 100%;
+        }
+
+        .ui-slider .value {
+            font-size: 12px;
+            color: #FFD700;
         }
         
         #dialogueBox {
@@ -311,6 +337,19 @@
                 🏜️ Golden Desert (SE)<br>
                 🐸 Shadowmere Swamp (SW)<br>
                 🏰 Mystical Tower (Center)
+            </div>
+            <div class="ui-section">
+                <strong>🎨 Display:</strong>
+                <div class="ui-slider">
+                    <label for="gammaSlider">Gamma Correction</label>
+                    <input id="gammaSlider" type="range" min="1" max="3" step="0.05" value="2.2" aria-label="Adjust gamma correction">
+                    <div class="value">Gamma: <span id="gammaValue">2.20</span></div>
+                </div>
+                <div class="ui-slider">
+                    <label for="exposureSlider">Scene Brightness</label>
+                    <input id="exposureSlider" type="range" min="0.6" max="1.8" step="0.05" value="1.1" aria-label="Adjust scene brightness">
+                    <div class="value">Exposure: <span id="exposureValue">1.10</span></div>
+                </div>
             </div>
         </div>
     </div>
@@ -656,14 +695,17 @@
             // Create materials
             const bodyMaterial = new BABYLON.StandardMaterial(`${name}_body`, scene);
             bodyMaterial.diffuseColor = bodyColor;
+            bodyMaterial.ambientColor = bodyColor.scale(0.55);
             bodyMaterial.freeze();
-            
+
             const headMaterial = new BABYLON.StandardMaterial(`${name}_head`, scene);
             headMaterial.diffuseColor = headColor;
+            headMaterial.ambientColor = headColor.scale(0.5);
             headMaterial.freeze();
-            
+
             const accessoryMaterial = new BABYLON.StandardMaterial(`${name}_accessory`, scene);
             accessoryMaterial.diffuseColor = accessoryColor;
+            accessoryMaterial.ambientColor = accessoryColor.scale(0.6);
             accessoryMaterial.freeze();
             
             // Create NPC body parts
@@ -771,8 +813,24 @@
                     antialias: true,
                     powerPreference: "high-performance",
                     stencil: true,
-                    alpha: false
+                    alpha: false,
+                    premultipliedAlpha: false
                 });
+
+                if (engine.getCaps && engine.getCaps().srgbSupport && BABYLON.Constants && typeof BABYLON.Constants.OUTPUT_COLOR_SPACE_SRGB !== 'undefined') {
+                    engine.outputColorSpace = BABYLON.Constants.OUTPUT_COLOR_SPACE_SRGB;
+                }
+
+                const gl = engine._gl;
+                if (gl && typeof gl.drawingBufferColorSpace !== 'undefined') {
+                    try {
+                        gl.drawingBufferColorSpace = "srgb";
+                    } catch (err) {
+                        console.warn("⚠️ Unable to force sRGB drawing buffer:", err);
+                    }
+                }
+
+                canvas.style.backgroundColor = '#000';
 
                 const applyHardwareScaling = () => {
                     const renderingCanvas = engine.getRenderingCanvas();
@@ -807,20 +865,138 @@
                 updateLoadingProgress("Creating enhanced scene...");
                 const scene = new BABYLON.Scene(engine);
                 currentScene = scene;
-                scene.clearColor = new BABYLON.Color3(0.2, 0.4, 0.6);
+                scene.clearColor = new BABYLON.Color3(0.25, 0.45, 0.68);
+                scene.ambientColor = new BABYLON.Color3(0.25, 0.3, 0.35);
                 scene.fogEnabled = false;
                 scene.autoClear = true;
                 scene.autoClearDepthAndStencil = true;
-                scene.imageProcessingConfiguration.toneMappingEnabled = true;
-                scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
-                scene.imageProcessingConfiguration.exposure = 1.3;
-                scene.imageProcessingConfiguration.contrast = 1.0;
+
+                const imageProcessing = scene.imageProcessingConfiguration;
+                if (imageProcessing) {
+                    if ('applyByPostProcess' in imageProcessing) {
+                        imageProcessing.applyByPostProcess = false;
+                    }
+                    imageProcessing.toneMappingEnabled = false;
+                    if ('toneMappingType' in imageProcessing) {
+                        imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
+                    }
+                    imageProcessing.exposure = 1.0;
+                    if ('gamma' in imageProcessing) {
+                        imageProcessing.gamma = 1.0;
+                    }
+                    imageProcessing.contrast = 1.05;
+                }
+
+                const gammaSlider = document.getElementById('gammaSlider');
+                const exposureSlider = document.getElementById('exposureSlider');
+                const gammaValueLabel = document.getElementById('gammaValue');
+                const exposureValueLabel = document.getElementById('exposureValue');
+
+                const gammaSettings = {
+                    gamma: gammaSlider ? parseFloat(gammaSlider.value) || 2.2 : 2.2,
+                    exposure: exposureSlider ? parseFloat(exposureSlider.value) || 1.1 : 1.1,
+                    whitePoint: 1.4
+                };
+
+                function setSceneGamma(value) {
+                    const numericValue = parseFloat(value);
+                    if (!isNaN(numericValue)) {
+                        gammaSettings.gamma = Math.min(3.5, Math.max(0.8, numericValue));
+                    }
+                    if (gammaValueLabel) {
+                        gammaValueLabel.textContent = gammaSettings.gamma.toFixed(2);
+                    }
+                    if (gammaSlider && Math.abs(parseFloat(gammaSlider.value) - gammaSettings.gamma) > 0.001) {
+                        gammaSlider.value = gammaSettings.gamma.toString();
+                    }
+                    return gammaSettings.gamma;
+                }
+
+                function setSceneExposure(value) {
+                    const numericValue = parseFloat(value);
+                    if (!isNaN(numericValue)) {
+                        gammaSettings.exposure = Math.min(3.0, Math.max(0.2, numericValue));
+                    }
+                    if (exposureValueLabel) {
+                        exposureValueLabel.textContent = gammaSettings.exposure.toFixed(2);
+                    }
+                    if (exposureSlider && Math.abs(parseFloat(exposureSlider.value) - gammaSettings.exposure) > 0.001) {
+                        exposureSlider.value = gammaSettings.exposure.toString();
+                    }
+                    return gammaSettings.exposure;
+                }
+
+                function setSceneWhitePoint(value) {
+                    const numericValue = parseFloat(value);
+                    if (!isNaN(numericValue)) {
+                        gammaSettings.whitePoint = Math.min(4.0, Math.max(0.1, numericValue));
+                    }
+                    return gammaSettings.whitePoint;
+                }
+
+                if (gammaSlider) {
+                    gammaSlider.addEventListener('input', (event) => setSceneGamma(event.target.value));
+                    gammaSlider.addEventListener('change', (event) => setSceneGamma(event.target.value));
+                }
+
+                if (exposureSlider) {
+                    exposureSlider.addEventListener('input', (event) => setSceneExposure(event.target.value));
+                    exposureSlider.addEventListener('change', (event) => setSceneExposure(event.target.value));
+                }
+
+                setSceneGamma(gammaSettings.gamma);
+                setSceneExposure(gammaSettings.exposure);
+
+                window.BritanniaDisplaySettings = window.BritanniaDisplaySettings || {};
+                window.BritanniaDisplaySettings.setGamma = setSceneGamma;
+                window.BritanniaDisplaySettings.setExposure = setSceneExposure;
+                window.BritanniaDisplaySettings.setWhitePoint = setSceneWhitePoint;
+                window.BritanniaDisplaySettings.getSettings = () => Object.assign({}, gammaSettings);
+
+                if (!BABYLON.Effect.ShadersStore["gammaCorrectionFragmentShader"]) {
+                    BABYLON.Effect.ShadersStore["gammaCorrectionFragmentShader"] = `
+                        precision highp float;
+                        varying vec2 vUV;
+                        uniform sampler2D textureSampler;
+                        uniform float gamma;
+                        uniform float exposure;
+                        uniform float whitePoint;
+
+                        vec3 reinhardToneMap(vec3 color, float whitePointValue, float exposureValue) {
+                            float adjustedWhitePoint = max(whitePointValue, 0.1);
+                            float adjustedExposure = max(exposureValue, 0.0);
+                            vec3 mapped = color * adjustedExposure;
+                            return (mapped * (1.0 + mapped / (adjustedWhitePoint * adjustedWhitePoint))) / (1.0 + mapped);
+                        }
+
+                        void main(void) {
+                            vec4 sceneColor = texture2D(textureSampler, vUV);
+                            vec3 toneMapped = reinhardToneMap(max(sceneColor.rgb, vec3(0.0)), whitePoint, exposure);
+                            vec3 srgb = pow(toneMapped, vec3(1.0 / max(gamma, 0.0001)));
+                            gl_FragColor = vec4(clamp(srgb, 0.0, 1.0), sceneColor.a);
+                        }
+                    `;
+                }
                 
                 updateLoadingProgress("Setting up enhanced camera system...");
                 const defaultCameraHeight = 15;
                 const defaultCameraDistance = 40;
                 const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, defaultCameraHeight, -defaultCameraDistance), scene);
                 camera.setTarget(BABYLON.Vector3.Zero());
+
+                const gammaCorrectionPostProcess = new BABYLON.PostProcess(
+                    "gammaCorrection",
+                    "gammaCorrection",
+                    ["gamma", "exposure", "whitePoint"],
+                    null,
+                    1.0,
+                    camera
+                );
+                gammaCorrectionPostProcess.onApply = function(effect) {
+                    effect.setFloat("gamma", gammaSettings.gamma);
+                    effect.setFloat("exposure", gammaSettings.exposure);
+                    effect.setFloat("whitePoint", gammaSettings.whitePoint);
+                };
 
                 // Camera controls
                 let isMouseDown = false;
@@ -874,12 +1050,17 @@
                 
                 // Enhanced lighting system
                 const ambientLight = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0), scene);
-                ambientLight.intensity = 1.0;
-                ambientLight.diffuse = new BABYLON.Color3(0.8, 0.9, 1.0);
+                ambientLight.intensity = 1.35;
+                ambientLight.diffuse = new BABYLON.Color3(0.9, 0.98, 1.0);
+                ambientLight.specular = new BABYLON.Color3(0.2, 0.22, 0.25);
+                ambientLight.groundColor = new BABYLON.Color3(0.45, 0.5, 0.55);
 
                 const sunLight = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-1, -1, -1), scene);
-                sunLight.intensity = 1.4;
-                sunLight.diffuse = new BABYLON.Color3(1, 0.95, 0.8);
+                sunLight.intensity = 1.2;
+                sunLight.diffuse = new BABYLON.Color3(1.0, 0.96, 0.88);
+                sunLight.specular = new BABYLON.Color3(1.0, 0.94, 0.85);
+                sunLight.shadowMinZ = -20;
+                sunLight.shadowMaxZ = 60;
                 
                 // Enhanced shadows
                 const shadowGenerator = new BABYLON.ShadowGenerator(2048, sunLight);
@@ -887,6 +1068,7 @@
                 shadowGenerator.bias = 0.0005;
                 shadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
                 shadowGenerator.usePercentageCloserFiltering = true;
+                shadowGenerator.darkness = 0.25;
                 
                 updateLoadingProgress("Creating diverse terrain regions...");
                 
@@ -894,6 +1076,7 @@
                 const ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 100, height: 100}, scene);
                 const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
                 groundMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
+                groundMaterial.ambientColor = groundMaterial.diffuseColor.scale(0.6);
                 ground.material = groundMaterial;
                 ground.receiveShadows = true;
                 
@@ -902,6 +1085,7 @@
                 forestGround.position.set(-30, 0.01, 20);
                 const forestMaterial = new BABYLON.StandardMaterial("forestMat", scene);
                 forestMaterial.diffuseColor = new BABYLON.Color3(0.15, 0.4, 0.15);
+                forestMaterial.ambientColor = forestMaterial.diffuseColor.scale(0.65);
                 forestGround.material = forestMaterial;
                 forestGround.receiveShadows = true;
                 
@@ -910,6 +1094,7 @@
                 desertGround.position.set(30, 0.01, -25);
                 const desertMaterial = new BABYLON.StandardMaterial("desertMat", scene);
                 desertMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.7, 0.4);
+                desertMaterial.ambientColor = desertMaterial.diffuseColor.scale(0.65);
                 desertGround.material = desertMaterial;
                 desertGround.receiveShadows = true;
                 
@@ -918,6 +1103,7 @@
                 swampGround.position.set(-35, 0.01, -25);
                 const swampMaterial = new BABYLON.StandardMaterial("swampMat", scene);
                 swampMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.4, 0.2);
+                swampMaterial.ambientColor = swampMaterial.diffuseColor.scale(0.6);
                 swampGround.material = swampMaterial;
                 swampGround.receiveShadows = true;
                 
@@ -930,18 +1116,21 @@
                 const skinMaterial = new BABYLON.StandardMaterial("skinMat", scene);
                 skinMaterial.diffuseColor = new BABYLON.Color3(0.95, 0.8, 0.7);
                 skinMaterial.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+                skinMaterial.ambientColor = skinMaterial.diffuseColor.scale(0.55);
                 skinMaterial.freeze();
-                
+
                 const armorMaterial = new BABYLON.StandardMaterial("armorMat", scene);
                 armorMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.5, 0.8);
                 armorMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
                 armorMaterial.specularPower = 256;
+                armorMaterial.ambientColor = armorMaterial.diffuseColor.scale(0.5);
                 armorMaterial.freeze();
-                
+
                 const metalMaterial = new BABYLON.StandardMaterial("metalMat", scene);
                 metalMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.8);
                 metalMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
                 metalMaterial.specularPower = 128;
+                metalMaterial.ambientColor = metalMaterial.diffuseColor.scale(0.45);
                 metalMaterial.freeze();
                 
                 // Head
@@ -963,6 +1152,7 @@
                 plume.parent = player;
                 const plumeMaterial = new BABYLON.StandardMaterial("plumeMat", scene);
                 plumeMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.2, 0.2);
+                plumeMaterial.ambientColor = plumeMaterial.diffuseColor.scale(0.6);
                 plume.material = plumeMaterial;
                 
                 // Torso
@@ -1002,6 +1192,7 @@
                 const capeMaterial = new BABYLON.StandardMaterial("capeMat", scene);
                 capeMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.1, 0.1);
                 capeMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.02, 0.02);
+                capeMaterial.ambientColor = capeMaterial.diffuseColor.scale(0.55);
                 cape.material = capeMaterial;
                 
                 // Sword
@@ -1013,6 +1204,7 @@
                 swordMaterial.diffuseColor = new BABYLON.Color3(0.9, 0.9, 1);
                 swordMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
                 swordMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.2);
+                swordMaterial.ambientColor = swordMaterial.diffuseColor.scale(0.5);
                 sword.material = swordMaterial;
                 
                 // Shield
@@ -1024,6 +1216,7 @@
                 shieldMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.6, 0.2);
                 shieldMaterial.specularColor = new BABYLON.Color3(0.9, 0.8, 0.4);
                 shieldMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.08, 0.02);
+                shieldMaterial.ambientColor = shieldMaterial.diffuseColor.scale(0.55);
                 shield.material = shieldMaterial;
                 
                 // Magical aura
@@ -1033,6 +1226,7 @@
                 const auraMaterial = new BABYLON.StandardMaterial("auraMat", scene);
                 auraMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1);
                 auraMaterial.emissiveColor = new BABYLON.Color3(0.2, 0.5, 0.8);
+                auraMaterial.ambientColor = auraMaterial.diffuseColor.scale(0.4);
                 auraMaterial.alpha = 0.3;
                 aura.material = auraMaterial;
                 
@@ -1094,6 +1288,7 @@
                     
                     const treeMaterial = new BABYLON.StandardMaterial("forestTreeMat", scene);
                     treeMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.15, 0.1);
+                    treeMaterial.ambientColor = treeMaterial.diffuseColor.scale(0.6);
                     tree.material = treeMaterial;
                     
                     const crown = BABYLON.MeshBuilder.CreateSphere("crown", {diameter: 2 + Math.random()}, scene);
@@ -1101,6 +1296,7 @@
                     crown.position.y += 2.5;
                     const crownMaterial = new BABYLON.StandardMaterial("crownMat", scene);
                     crownMaterial.diffuseColor = new BABYLON.Color3(0.1, 0.4, 0.1);
+                    crownMaterial.ambientColor = crownMaterial.diffuseColor.scale(0.65);
                     crown.material = crownMaterial;
                     
                     shadowGenerator.getShadowMap().renderList.push(tree, crown);
@@ -1115,6 +1311,7 @@
                     
                     const cactusMaterial = new BABYLON.StandardMaterial("cactusMat", scene);
                     cactusMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
+                    cactusMaterial.ambientColor = cactusMaterial.diffuseColor.scale(0.6);
                     cactus.material = cactusMaterial;
                     
                     shadowGenerator.getShadowMap().renderList.push(cactus);
@@ -1125,6 +1322,7 @@
                 swampHut.position.set(-35, 1.5, -25);
                 const hutMaterial = new BABYLON.StandardMaterial("hutMat", scene);
                 hutMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.1);
+                hutMaterial.ambientColor = hutMaterial.diffuseColor.scale(0.6);
                 hutMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.05, 0.02);
                 swampHut.material = hutMaterial;
                 
@@ -1133,6 +1331,7 @@
                 tower.position.set(5, 4, 5);
                 const towerMaterial = new BABYLON.StandardMaterial("towerMat", scene);
                 towerMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.6);
+                towerMaterial.ambientColor = towerMaterial.diffuseColor.scale(0.55);
                 tower.material = towerMaterial;
                 
                 const towerRoof = BABYLON.MeshBuilder.CreateCylinder("towerRoof", {
@@ -1141,6 +1340,7 @@
                 towerRoof.position.set(5, 9, 5);
                 const roofMaterial = new BABYLON.StandardMaterial("roofMat", scene);
                 roofMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.1, 0.1);
+                roofMaterial.ambientColor = roofMaterial.diffuseColor.scale(0.6);
                 towerRoof.material = roofMaterial;
                 
                 // Magical crystal on tower
@@ -1150,6 +1350,7 @@
                 const crystalMaterial = new BABYLON.StandardMaterial("crystalMat", scene);
                 crystalMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.3, 1);
                 crystalMaterial.emissiveColor = new BABYLON.Color3(0.4, 0.1, 0.5);
+                crystalMaterial.ambientColor = crystalMaterial.diffuseColor.scale(0.5);
                 crystal.material = crystalMaterial;
                 
                 // Animate crystal
