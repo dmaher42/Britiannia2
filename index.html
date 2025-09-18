@@ -238,6 +238,58 @@
         THREE.Cache.enabled = true;
 
         const MODEL_BASE_URL = "https://dmaher42.github.io/Britiannia2/assets/models/web/";
+        const SERVICE_WORKER_PATH = "britannia-service-worker.js";
+
+        const setupServiceWorker = async () => {
+            if (!("serviceWorker" in navigator)) {
+                return;
+            }
+
+            const currentScope = window.location.href;
+            const isWithinScope = (registration) => currentScope.startsWith(registration.scope);
+            const getPathname = (scriptURL) => {
+                try {
+                    return new URL(scriptURL).pathname;
+                } catch (error) {
+                    console.warn("Unable to parse service worker script URL:", scriptURL, error);
+                    return "";
+                }
+            };
+            const isCurrentScript = (scriptURL) => getPathname(scriptURL).endsWith(`/${SERVICE_WORKER_PATH}`);
+
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                const legacyRegistrations = registrations.filter((registration) => {
+                    if (!isWithinScope(registration)) {
+                        return false;
+                    }
+
+                    const scriptURLs = [
+                        registration.active?.scriptURL,
+                        registration.waiting?.scriptURL,
+                        registration.installing?.scriptURL
+                    ].filter(Boolean);
+
+                    if (scriptURLs.length === 0) {
+                        return false;
+                    }
+
+                    return scriptURLs.every((url) => !isCurrentScript(url));
+                });
+
+                await Promise.all(
+                    legacyRegistrations.map((registration) =>
+                        registration.unregister().catch(() => false)
+                    )
+                );
+
+                await navigator.serviceWorker.register(SERVICE_WORKER_PATH, { scope: "./" });
+            } catch (error) {
+                console.warn("Service worker setup failed:", error);
+            }
+        };
+
+        setupServiceWorker();
 
         const REGION_DEFINITIONS = [
             {
