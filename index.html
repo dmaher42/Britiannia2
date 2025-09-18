@@ -665,15 +665,17 @@
                 scene.autoClearDepthAndStencil = true;
                 
                 updateLoadingProgress("Setting up enhanced camera system...");
-                const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 10, -25), scene);
+                const defaultCameraHeight = 15;
+                const defaultCameraDistance = 40;
+                const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, defaultCameraHeight, -defaultCameraDistance), scene);
                 camera.setTarget(BABYLON.Vector3.Zero());
-                
+
                 // Camera controls
                 let isMouseDown = false;
                 let lastMouseX = 0;
                 let lastMouseY = 0;
                 let alpha = 0;
-                let distance = 25;
+                let distance = defaultCameraDistance;
                 
                 canvas.addEventListener('mousedown', function(event) {
                     if (event.button === 0 && !isDialogueOpen) {
@@ -704,7 +706,7 @@
                         
                         camera.position.x = player.position.x + Math.sin(alpha) * distance;
                         camera.position.z = player.position.z + Math.cos(alpha) * distance;
-                        camera.position.y = Math.max(5, Math.min(20, 10 + deltaY * 0.01));
+                        camera.position.y = Math.max(8, Math.min(25, defaultCameraHeight + deltaY * 0.01));
                         
                         camera.setTarget(player.position);
                         
@@ -1152,7 +1154,7 @@
                         if (!isMouseDown) {
                             const targetCameraPos = new BABYLON.Vector3(
                                 player.position.x + Math.sin(alpha) * distance,
-                                10,
+                                defaultCameraHeight,
                                 player.position.z + Math.cos(alpha) * distance
                             );
                             camera.position = BABYLON.Vector3.Lerp(camera.position, targetCameraPos, 0.05);
