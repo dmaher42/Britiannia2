@@ -25,13 +25,84 @@
             top: 20px;
             left: 20px;
             color: #fff;
-            background: rgba(0,0,0,0.8);
-            padding: 15px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 12px 14px;
             border-radius: 8px;
             z-index: 100;
-            font-size: 14px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 13px;
+            line-height: 1.35;
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            width: min(260px, 28vw);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            box-sizing: border-box;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        #gameUI.collapsed {
+            width: auto;
+            max-height: none;
+            overflow: visible;
+            padding: 10px 12px;
+            opacity: 0.85;
+        }
+
+        #gameUI.collapsed #uiContent {
+            display: none;
+        }
+
+        #gameUI.collapsed .ui-header {
+            margin-bottom: 0;
+        }
+
+        #gameUI:hover {
+            opacity: 1;
+        }
+
+        #gameUI.collapsed:hover {
+            opacity: 1;
+        }
+
+        .ui-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .ui-header h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        .ui-toggle {
+            background: rgba(255, 215, 0, 0.15);
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            color: #FFD700;
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .ui-toggle:hover,
+        .ui-toggle:focus {
+            background: rgba(255, 215, 0, 0.3);
+            color: #fff;
+            outline: none;
+        }
+
+        .ui-content {
+            display: grid;
+            gap: 8px;
         }
         
         #dialogueBox {
@@ -164,14 +235,26 @@
         }
         
         .ui-section {
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
         }
-        
+
         .ui-section:last-child {
             border-bottom: none;
             margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        @media (max-width: 768px) {
+            #gameUI {
+                width: min(220px, 70vw);
+                font-size: 12px;
+            }
+
+            .ui-header h3 {
+                font-size: 15px;
+            }
         }
 
         .npc-indicator {
@@ -206,27 +289,30 @@
     <canvas id="gameCanvas" style="display: none;"></canvas>
     
     <div id="gameUI" style="display: none;">
-        <div class="ui-section">
+        <div class="ui-header">
             <h3>🏰 Britannia Reborn</h3>
+            <button id="toggleUI" class="ui-toggle" type="button" aria-label="Collapse information panel" aria-expanded="true" title="Collapse information panel">−</button>
         </div>
-        <div class="ui-section">
-            <div>Position: <span id="playerPos">0, 0</span></div>
-            <div>Region: <span id="playerRegion">Central Plains</span></div>
-            <div>Status: <span id="gameStatus">Exploring</span></div>
-        </div>
-        <div class="ui-section">
-            <strong>Controls:</strong><br>
-            WASD/Arrow Keys: Move<br>
-            Mouse: Rotate Camera<br>
-            Space: Interact/Talk<br>
-            ESC: Close Dialogue
-        </div>
-        <div class="ui-section">
-            <strong>🗺️ Regions:</strong><br>
-            🌲 Whispering Woods (NW)<br>
-            🏜️ Golden Desert (SE)<br>
-            🐸 Shadowmere Swamp (SW)<br>
-            🏰 Mystical Tower (Center)
+        <div id="uiContent" class="ui-content">
+            <div class="ui-section">
+                <div>Position: <span id="playerPos">0, 0</span></div>
+                <div>Region: <span id="playerRegion">Central Plains</span></div>
+                <div>Status: <span id="gameStatus">Exploring</span></div>
+            </div>
+            <div class="ui-section">
+                <strong>Controls:</strong><br>
+                WASD/Arrow Keys: Move<br>
+                Mouse: Rotate Camera<br>
+                Space: Interact/Talk<br>
+                ESC: Close Dialogue
+            </div>
+            <div class="ui-section">
+                <strong>🗺️ Regions:</strong><br>
+                🌲 Whispering Woods (NW)<br>
+                🏜️ Golden Desert (SE)<br>
+                🐸 Shadowmere Swamp (SW)<br>
+                🏰 Mystical Tower (Center)
+            </div>
         </div>
     </div>
 
@@ -247,6 +333,7 @@
         let currentNPC = null;
         let gameNPCs = [];
         let isDialogueOpen = false;
+        let isUIPanelCollapsed = false;
         
         // Block gamepad to prevent conflicts
         if (navigator.getGamepads) {
@@ -392,6 +479,37 @@
             document.getElementById('errorScreen').style.display = 'block';
             document.getElementById('errorMessage').textContent = message;
             console.error("❌ Game Error:", message);
+        }
+
+        function toggleGameUI(forceState) {
+            const panel = document.getElementById('gameUI');
+            const toggleButton = document.getElementById('toggleUI');
+
+            if (!panel || !toggleButton) {
+                return;
+            }
+
+            if (typeof forceState === 'boolean') {
+                isUIPanelCollapsed = forceState;
+            } else {
+                isUIPanelCollapsed = !isUIPanelCollapsed;
+            }
+
+            panel.classList.toggle('collapsed', isUIPanelCollapsed);
+            toggleButton.setAttribute('aria-expanded', (!isUIPanelCollapsed).toString());
+            toggleButton.textContent = isUIPanelCollapsed ? '+' : '−';
+            const label = isUIPanelCollapsed ? 'Expand information panel' : 'Collapse information panel';
+            toggleButton.setAttribute('aria-label', label);
+            toggleButton.setAttribute('title', label);
+        }
+
+        const toggleUIButton = document.getElementById('toggleUI');
+        if (toggleUIButton) {
+            toggleUIButton.addEventListener('click', () => toggleGameUI());
+        }
+
+        if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+            toggleGameUI(true);
         }
         
         // Dialogue System Functions
