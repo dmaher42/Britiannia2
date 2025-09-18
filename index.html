@@ -774,8 +774,16 @@
 
                 const applyHardwareScaling = () => {
                     const pixelRatio = window.devicePixelRatio || 1;
-                    const scalingLevel = Math.min(1, 1 / pixelRatio);
-                    engine.setHardwareScalingLevel(scalingLevel);
+                    const desiredQuality = Math.max(pixelRatio, 1.5);
+                    const caps = engine.getCaps ? engine.getCaps() : null;
+                    const maxQuality = caps && caps.maxMSAASamples > 1 ? 2.5 : 2.0;
+                    const effectiveRatio = Math.min(desiredQuality, maxQuality);
+                    engine.setHardwareScalingLevel(1 / effectiveRatio);
+
+                    const renderingCanvas = engine.getRenderingCanvas();
+                    if (renderingCanvas) {
+                        renderingCanvas.style.imageRendering = 'auto';
+                    }
                 };
 
                 applyHardwareScaling();
@@ -787,6 +795,10 @@
                 scene.fogEnabled = false;
                 scene.autoClear = true;
                 scene.autoClearDepthAndStencil = true;
+                scene.imageProcessingConfiguration.toneMappingEnabled = true;
+                scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+                scene.imageProcessingConfiguration.exposure = 1.05;
+                scene.imageProcessingConfiguration.contrast = 1.1;
                 
                 updateLoadingProgress("Setting up enhanced camera system...");
                 const defaultCameraHeight = 15;
@@ -1369,10 +1381,19 @@
                 }
                 
                 updateLoadingProgress("Optimizing performance...");
-                
+                updateLoadingProgress("Enhancing visual clarity...");
+
                 // Add post-processing for enhanced visuals
-                const postProcess = new BABYLON.FxaaPostProcess("fxaa", 1.0, camera);
-                postProcess.samples = 4;
+                const fxaaPostProcess = new BABYLON.FxaaPostProcess("fxaa", 1.0, camera);
+                fxaaPostProcess.samples = 4;
+
+                if (BABYLON.SharpenPostProcess) {
+                    const sharpenPostProcess = new BABYLON.SharpenPostProcess("sharpen", 1.0, camera);
+                    sharpenPostProcess.edgeAmount = 0.45;
+                    sharpenPostProcess.colorAmount = 0.25;
+                } else {
+                    console.warn("Sharpen post-process not available in this build of Babylon.js.");
+                }
                 
                 updateLoadingProgress("Starting game world...");
                 
