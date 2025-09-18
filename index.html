@@ -3,1682 +3,1288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Britannia Reborn - NPCs & Dialogue Edition</title>
+    <title>Britannia2 — Realm Prototype</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #0b0f1a;
-            font-family: 'Courier New', monospace;
+        :root {
             color-scheme: dark;
         }
 
-        #gameCanvas {
-            width: 100%;
-            height: 100vh;
-            display: block;
-            outline: none;
-            background-color: #000;
-            filter: none !important;
-            mix-blend-mode: normal;
-            image-rendering: auto;
-            opacity: 1;
-            touch-action: none;
-        }
-        
-        #gameUI {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #fff;
-            background: rgba(0, 0, 0, 0.75);
-            padding: 12px 14px;
-            border-radius: 8px;
-            z-index: 100;
-            font-size: 13px;
-            line-height: 1.35;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            width: min(260px, 28vw);
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
+        * {
             box-sizing: border-box;
-            transition: transform 0.2s ease, opacity 0.2s ease;
         }
 
-        #gameUI.collapsed {
-            width: auto;
-            max-height: none;
-            overflow: visible;
-            padding: 10px 12px;
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: "Cinzel", "Segoe UI", system-ui, sans-serif;
+            background: #05090f;
+            color: #f4e9ce;
+        }
+
+        #gameCanvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            touch-action: none;
+            outline: none;
+            background: #04060b;
+        }
+
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 50% 30%, rgba(32, 52, 78, 0.92), rgba(6, 12, 20, 0.95));
+            color: #f9f1dc;
+            text-align: center;
+            gap: 12px;
+            z-index: 20;
+            padding: 24px;
+        }
+
+        #loadingOverlay.hidden {
+            display: none;
+        }
+
+        #loadingOverlay .title {
+            font-size: clamp(1.2rem, 3vw, 2.1rem);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        #loadingOverlay .subtitle {
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
             opacity: 0.85;
         }
 
-        #gameUI.collapsed #uiContent {
-            display: none;
-        }
-
-        #gameUI.collapsed .ui-header {
-            margin-bottom: 0;
-        }
-
-        #gameUI:hover {
-            opacity: 1;
-        }
-
-        #gameUI.collapsed:hover {
-            opacity: 1;
-        }
-
-        .ui-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-
-        .ui-header h3 {
-            margin: 0;
-            font-size: 16px;
-        }
-
-        .ui-toggle {
-            background: rgba(255, 215, 0, 0.15);
-            border: 1px solid rgba(255, 215, 0, 0.4);
-            color: #FFD700;
+        #progressBarContainer {
+            width: min(360px, 80vw);
+            height: 6px;
             border-radius: 4px;
-            width: 28px;
-            height: 28px;
-            cursor: pointer;
-            font-size: 16px;
-            line-height: 1;
-            display: flex;
+            background: rgba(255, 255, 255, 0.18);
+            overflow: hidden;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.35) inset;
+        }
+
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #fce38a, #f38181);
+            transition: width 0.25s ease;
+        }
+
+        #errorOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(12, 10, 16, 0.92);
+            display: none;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 16px;
+            text-align: center;
+            z-index: 30;
+            padding: 30px;
+        }
+
+        #errorOverlay h2 {
+            margin: 0;
+            font-size: clamp(1.1rem, 2.5vw, 1.8rem);
+            color: #ffb4a2;
+        }
+
+        #errorOverlay p {
+            margin: 0;
+            max-width: 420px;
+            line-height: 1.4;
+        }
+
+        #retryButton {
+            padding: 10px 22px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 214, 153, 0.4);
+            background: rgba(255, 214, 153, 0.18);
+            color: #ffe8c8;
+            font-size: 0.95rem;
+            cursor: pointer;
             transition: background 0.2s ease, color 0.2s ease;
         }
 
-        .ui-toggle:hover,
-        .ui-toggle:focus {
-            background: rgba(255, 215, 0, 0.3);
-            color: #fff;
+        #retryButton:hover,
+        #retryButton:focus-visible {
+            background: rgba(255, 214, 153, 0.3);
+            color: #fff9f0;
             outline: none;
         }
 
-        .ui-content {
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
             display: grid;
-            gap: 8px;
+            gap: 6px;
+            padding: 14px 16px;
+            width: min(280px, 40vw);
+            background: rgba(8, 11, 18, 0.7);
+            border: 1px solid rgba(255, 236, 201, 0.18);
+            border-radius: 10px;
+            color: #f6eed4;
+            font-size: 0.9rem;
+            line-height: 1.35;
+            backdrop-filter: blur(6px);
+            pointer-events: none;
+            z-index: 5;
         }
 
-        .ui-slider {
-            display: grid;
-            gap: 4px;
+        #hud h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            letter-spacing: 0.05em;
         }
 
-        .ui-slider label {
-            font-size: 12px;
-            letter-spacing: 0.02em;
+        #hud p {
+            margin: 0;
         }
 
-        .ui-slider input[type="range"] {
-            width: 100%;
+        #hud strong {
+            color: #ffd166;
+            font-weight: 600;
         }
 
-        .ui-slider .value {
-            font-size: 12px;
-            color: #FFD700;
+        #hud .controls {
+            font-size: 0.8rem;
+            opacity: 0.75;
         }
-        
-        #dialogueBox {
-            position: absolute;
-            bottom: 20px;
+
+        #interactionPrompt {
+            position: fixed;
+            bottom: 18vh;
             left: 50%;
             transform: translateX(-50%);
-            width: 600px;
-            max-width: 90vw;
-            background: rgba(0, 0, 0, 0.95);
-            border: 2px solid #8B4513;
-            border-radius: 8px;
-            padding: 20px;
-            color: #FFD700;
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
+            background: rgba(14, 18, 28, 0.75);
+            padding: 10px 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 228, 179, 0.35);
+            color: #ffe1a8;
+            font-size: 0.9rem;
             display: none;
-            z-index: 150;
-            box-shadow: 0 0 20px rgba(139, 69, 19, 0.5);
-        }
-        
-        #dialogueBox .npc-name {
-            color: #FFA500;
-            font-weight: bold;
-            font-size: 18px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #8B4513;
-            padding-bottom: 5px;
-        }
-        
-        #dialogueBox .dialogue-text {
-            margin: 15px 0;
-            line-height: 1.4;
-            min-height: 60px;
-        }
-        
-        #dialogueBox .keywords {
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #8B4513;
-        }
-        
-        #dialogueBox .keyword {
-            display: inline-block;
-            background: rgba(139, 69, 19, 0.7);
-            color: #FFD700;
-            padding: 5px 10px;
-            margin: 3px;
-            border-radius: 3px;
-            cursor: pointer;
-            border: 1px solid #8B4513;
-            transition: all 0.2s;
-        }
-        
-        #dialogueBox .keyword:hover {
-            background: rgba(139, 69, 19, 1);
-            color: #FFF;
-            transform: scale(1.05);
-        }
-        
-        #dialogueBox .close-btn {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            background: none;
-            border: none;
-            color: #FFD700;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 0;
-            width: 25px;
-            height: 25px;
-        }
-        
-        #interactionHint {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: #FFD700;
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            display: none;
-            z-index: 140;
-            border: 1px solid #8B4513;
-        }
-        
-        #loadingScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff;
-            font-size: 18px;
-            text-align: center;
-            z-index: 200;
-        }
-        
-        #errorScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #ff6666;
-            font-size: 16px;
-            text-align: center;
-            background: rgba(0,0,0,0.9);
-            padding: 30px;
-            border-radius: 10px;
-            display: none;
-            z-index: 200;
-            max-width: 80%;
-        }
-        
-        .loading-spinner {
-            border: 4px solid #333;
-            border-top: 4px solid #fff;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .ui-section {
-            margin-bottom: 6px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            pointer-events: none;
+            z-index: 8;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
         }
 
-        .ui-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0;
+        #interactionPrompt span {
+            font-weight: 700;
+            color: #fff1c1;
         }
 
         @media (max-width: 768px) {
-            #gameUI {
-                width: min(220px, 70vw);
-                font-size: 12px;
+            #hud {
+                width: min(240px, 70vw);
+                font-size: 0.8rem;
+                top: 12px;
+                left: 12px;
             }
 
-            .ui-header h3 {
-                font-size: 15px;
+            #hud h2 {
+                font-size: 1rem;
             }
-        }
 
-        .npc-indicator {
-            position: absolute;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 215, 0, 0.9);
-            color: #000;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: bold;
-            display: none;
-            z-index: 120;
+            #interactionPrompt {
+                font-size: 0.8rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="loadingScreen">
-        <div>🏰 Loading Enhanced Britannia with NPCs...</div>
-        <div class="loading-spinner"></div>
-        <div id="loadingProgress">Initializing...</div>
-    </div>
-    
-    <div id="errorScreen">
-        <h3>⚠️ Game Error</h3>
-        <p id="errorMessage">Checking...</p>
-        <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 15px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer;">Retry</button>
-    </div>
-    
-    <canvas id="gameCanvas" style="display: none;"></canvas>
-    
-    <div id="gameUI" style="display: none;">
-        <div class="ui-header">
-            <h3>🏰 Britannia Reborn</h3>
-            <button id="toggleUI" class="ui-toggle" type="button" aria-label="Collapse information panel" aria-expanded="true" title="Collapse information panel">−</button>
+    <div id="loadingOverlay" role="status" aria-live="polite">
+        <div class="title">🏰 Forging Britannia</div>
+        <div id="loadingText" class="subtitle">Preparing the 3D realm...</div>
+        <div id="progressBarContainer" aria-hidden="true">
+            <div id="progressBar"></div>
         </div>
-        <div id="uiContent" class="ui-content">
-            <div class="ui-section">
-                <div>Position: <span id="playerPos">0, 0</span></div>
-                <div>Region: <span id="playerRegion">Central Plains</span></div>
-                <div>Status: <span id="gameStatus">Exploring</span></div>
-            </div>
-            <div class="ui-section">
-                <strong>Controls:</strong><br>
-                WASD/Arrow Keys: Move<br>
-                Mouse: Rotate Camera<br>
-                Space: Interact/Talk<br>
-                ESC: Close Dialogue
-            </div>
-            <div class="ui-section">
-                <strong>🗺️ Regions:</strong><br>
-                🌲 Whispering Woods (NW)<br>
-                🏜️ Golden Desert (SE)<br>
-                🐸 Shadowmere Swamp (SW)<br>
-                🏰 Mystical Tower (Center)
-            </div>
-            <div class="ui-section">
-                <strong>🎨 Display:</strong>
-                <div class="ui-slider">
-                    <label for="gammaSlider">Gamma Correction</label>
-                    <input id="gammaSlider" type="range" min="1" max="3" step="0.05" value="2.2" aria-label="Adjust gamma correction">
-                    <div class="value">Gamma: <span id="gammaValue">2.20</span></div>
-                </div>
-                <div class="ui-slider">
-                    <label for="exposureSlider">Scene Brightness</label>
-                    <input id="exposureSlider" type="range" min="0.6" max="1.8" step="0.05" value="1.1" aria-label="Adjust scene brightness">
-                    <div class="value">Exposure: <span id="exposureValue">1.10</span></div>
-                </div>
-            </div>
-        </div>
+        <div class="subtitle" id="loadingTip">Tip: Click the world to take control of your hero.</div>
     </div>
 
-    <div id="interactionHint">Press SPACE to talk</div>
-
-    <div id="dialogueBox">
-        <button class="close-btn" onclick="closeDialogue()">×</button>
-        <div class="npc-name" id="npcName">Unknown</div>
-        <div class="dialogue-text" id="dialogueText">...</div>
-        <div class="keywords" id="keywordContainer"></div>
+    <div id="errorOverlay" role="alert">
+        <h2>⚠️ The realm failed to awaken</h2>
+        <p id="errorMessage">An unexpected error occurred.</p>
+        <button id="retryButton" type="button">Retry</button>
     </div>
 
-    <script>
-        console.log("🏰 Starting Enhanced Britannia Reborn with NPCs...");
-        
-        // Game state
-        let currentScene = null;
-        let currentNPC = null;
-        let gameNPCs = [];
-        let isDialogueOpen = false;
-        let isUIPanelCollapsed = false;
-        
-        // Block gamepad to prevent conflicts
-        if (navigator.getGamepads) {
-            navigator.getGamepads = function() { return []; };
-            console.log("Gamepad API blocked for stability");
-        }
-        
-        // NPC Database - Ultima-style characters
-        const NPCDatabase = {
-            'Guard Captain Marcus': {
-                name: 'Guard Captain Marcus',
-                job: 'Captain of the Royal Guard',
-                appearance: 'guard',
-                responses: {
-                    'name': "I am Marcus, Captain of the Royal Guard of Britannia.",
-                    'job': "My duty is to protect the realm and its people from all manner of threats. The roads have been dangerous lately.",
-                    'guard': "The Royal Guard maintains order throughout the realm. We patrol the roads and protect travelers.",
-                    'britannia': "Britannia is a land of magic and wonder, but also of great peril. Dark forces stir in the corners of our realm.",
-                    'threat': "Strange creatures have been seen near the Shadowmere Swamp. The Witch of the Marsh grows more bold each day.",
-                    'witch': "The Witch of the Marsh dwells in the swamp to the southwest. She practices dark magics and corrupts the land.",
-                    'tower': "The Mystical Tower holds ancient knowledge. The Sage who dwells there is wise but reclusive.",
-                    'sage': "Master Aldrich is the keeper of the tower's knowledge. He may aid thee if thy cause is just.",
-                    'bye': "Farewell, traveler. May thy path be safe and thy purpose true."
-                },
-                initialKeywords: ['name', 'job', 'britannia', 'threat']
+    <canvas id="gameCanvas" aria-label="Britannia 3D world"></canvas>
+
+    <section id="hud" aria-live="polite">
+        <h2>Britannia2 Explorer</h2>
+        <p><strong>Position:</strong> <span id="hudPosition">0, 0</span></p>
+        <p><strong>Region:</strong> <span id="hudRegion">🌾 Central Plains</span></p>
+        <p><strong>Status:</strong> <span id="hudStatus">Click the realm to begin your journey.</span></p>
+        <p class="controls">WASD: Move • Mouse: Look • Shift: Sprint • E: Interact</p>
+    </section>
+
+    <div id="interactionPrompt">Press <span>E</span> to inspect</div>
+
+    <script type="module">
+        import * as THREE from "https://unpkg.com/three@0.160.1/build/three.module.js";
+        import { GLTFLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js";
+        import { DRACOLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/DRACOLoader.js";
+        import { PointerLockControls } from "https://unpkg.com/three@0.160.1/examples/jsm/controls/PointerLockControls.js";
+        import { SkeletonUtils } from "https://unpkg.com/three@0.160.1/examples/jsm/utils/SkeletonUtils.js";
+
+        THREE.Cache.enabled = true;
+
+        const MODEL_BASE_URL = "https://dmaher42.github.io/Britiannia2/assets/models/web/";
+
+        const REGION_DEFINITIONS = [
+            {
+                id: "central",
+                name: "Central Plains",
+                label: "🌾 Central Plains",
+                color: 0x6b8f3f,
+                center: { x: 0, y: 0, z: 0 },
+                size: { x: 180, y: 0, z: 180 },
+                altitude: 0,
+                buildingCountRange: [5, 8],
+                buildingTemplates: [
+                    { file: "plains_great_hall.glb", label: "Great Hall", scale: 1.2, spacing: 28 },
+                    { file: "plains_longhouse.glb", label: "Longhouse", scale: 1.0, spacing: 24 },
+                    { file: "plains_market.glb", label: "Market Stalls", scale: 0.95, spacing: 22 },
+                    { file: "plains_farmstead.glb", label: "Farmstead", scale: 0.9, spacing: 20 }
+                ],
+                decorations: { type: "fields", rows: 3, columns: 4 }
             },
-            
-            'Blacksmith Gareth': {
-                name: 'Blacksmith Gareth',
-                job: 'Master Blacksmith',
-                appearance: 'blacksmith',
-                responses: {
-                    'name': "I am Gareth, master of forge and flame. I craft the finest weapons and armor in all Britannia.",
-                    'job': "I work the forge day and night, shaping metal into tools of war and peace. Each piece bears my mark of quality.",
-                    'forge': "My forge burns with eternal flame, heated by magic crystals from the mystical tower. The fire never dies.",
-                    'weapon': "I can craft any blade thy heart desires, from simple daggers to mighty two-handed swords. Bring me the materials.",
-                    'armor': "Good armor can mean the difference between life and death. I craft only the finest mail and plate.",
-                    'crystal': "The magic crystals fuel my forge with supernatural heat. Without them, I could not craft such fine works.",
-                    'tower': "The Sage at the tower provides my crystals in exchange for specially crafted items. 'Tis a fair trade.",
-                    'material': "I need rare ores and gems to craft the best equipment. The desert caves hold precious stones.",
-                    'bye': "Farewell! May thy blade stay sharp and thy armor true."
-                },
-                initialKeywords: ['name', 'job', 'weapon', 'armor']
+            {
+                id: "woods",
+                name: "Whispering Woods",
+                label: "🌲 Whispering Woods",
+                color: 0x29553a,
+                center: { x: -110, y: 0, z: 60 },
+                size: { x: 120, y: 0, z: 120 },
+                altitude: 0,
+                buildingCountRange: [4, 6],
+                buildingTemplates: [
+                    { file: "woods_lodge.glb", label: "Forest Lodge", scale: 0.95, spacing: 24 },
+                    { file: "woods_watchtower.glb", label: "Grove Watchtower", scale: 1.1, spacing: 28 },
+                    { file: "woods_cabin.glb", label: "Hunter's Cabin", scale: 0.85, spacing: 20 }
+                ],
+                decorations: { type: "trees", count: 80 }
             },
-            
-            'Innkeeper Sarah': {
-                name: 'Innkeeper Sarah',
-                job: 'Keeper of the Wanderer\'s Rest',
-                appearance: 'innkeeper',
-                responses: {
-                    'name': "I am Sarah, keeper of this humble inn. All travelers are welcome at the Wanderer's Rest.",
-                    'job': "I provide food, drink, and shelter to weary travelers. Mine inn is a safe haven in troubled times.",
-                    'inn': "The Wanderer's Rest has sheltered travelers for three generations. My grandmother built this place.",
-                    'food': "I serve hearty stew, fresh bread, and the finest ale in the realm. A good meal restores both body and spirit.",
-                    'room': "A warm bed and safe lodging cost but a few gold pieces. Rest well, for the road ahead is perilous.",
-                    'travel': "Many travelers pass through here. I hear tales from across the realm - some wondrous, others terrifying.",
-                    'news': "Word reaches me of strange happenings. Lights in the swamp, voices from the desert, magic in the woods.",
-                    'tale': "Old Theron the Merchant spoke of ruins in the forest. Ancient stones covered in mystical runes.",
-                    'bye': "Safe travels, friend. Remember, the Wanderer's Rest always has room for one more."
-                },
-                initialKeywords: ['name', 'job', 'food', 'news']
+            {
+                id: "desert",
+                name: "Golden Desert",
+                label: "🏜️ Golden Desert",
+                color: 0xcfa76b,
+                center: { x: 120, y: 0, z: -80 },
+                size: { x: 150, y: 0, z: 140 },
+                altitude: -0.2,
+                buildingCountRange: [4, 6],
+                buildingTemplates: [
+                    { file: "desert_caravanserai.glb", label: "Caravanserai", scale: 1.1, spacing: 30 },
+                    { file: "desert_watchtower.glb", label: "Desert Watchtower", scale: 1.0, spacing: 26 },
+                    { file: "desert_market.glb", label: "Mirage Bazaar", scale: 0.95, spacing: 22 }
+                ],
+                decorations: { type: "dunes", count: 40 }
             },
-            
-            'Sage Aldrich': {
-                name: 'Sage Aldrich',
-                job: 'Keeper of Ancient Knowledge',
-                appearance: 'sage',
-                responses: {
-                    'name': "I am Aldrich, guardian of the mystical arts and keeper of ancient wisdom.",
-                    'job': "I study the arcane mysteries of magic and maintain the great crystal that powers this tower.",
-                    'magic': "Magic flows through all things in Britannia. The crystal amplifies this power and focuses it for good.",
-                    'crystal': "The Great Crystal of Power was placed here by the ancient mages. It protects the realm from dark forces.",
-                    'ancient': "Long ago, powerful wizards built this tower as a beacon of light against the darkness. I continue their work.",
-                    'knowledge': "Within these walls lie scrolls and tomes containing centuries of magical learning. Knowledge is power.",
-                    'spell': "I can teach basic spells to those pure of heart. Magic must never be used for evil purposes.",
-                    'darkness': "Dark forces gather strength in the outer reaches. The witch's power grows, and evil stirs in forgotten places.",
-                    'wisdom': "True wisdom comes not from books alone, but from understanding the balance between light and shadow.",
-                    'bye': "Go in peace, seeker. May the light of knowledge guide thy path through the darkness ahead."
-                },
-                initialKeywords: ['name', 'job', 'magic', 'wisdom']
+            {
+                id: "swamp",
+                name: "Shadowmere Swamp",
+                label: "🐸 Shadowmere Swamp",
+                color: 0x27403b,
+                center: { x: -120, y: 0, z: -90 },
+                size: { x: 140, y: 0, z: 140 },
+                altitude: -0.4,
+                buildingCountRange: [3, 5],
+                buildingTemplates: [
+                    { file: "swamp_hut.glb", label: "Marsh Hut", scale: 0.9, spacing: 24 },
+                    { file: "swamp_shrine.glb", label: "Witch's Shrine", scale: 1.0, spacing: 26 },
+                    { file: "swamp_watch.glb", label: "Bog Watchtower", scale: 0.95, spacing: 24 }
+                ],
+                decorations: { type: "reeds", count: 70 }
             },
-            
-            'Witch Morgana': {
-                name: 'Witch Morgana',
-                job: 'Mistress of the Marsh',
-                appearance: 'witch',
-                responses: {
-                    'name': "I am Morgana, and these swamplands bow to my will. Few dare speak my name aloud.",
-                    'job': "I command the forces of nature and shadow. The marsh spirits are my servants, the mist my cloak.",
-                    'magic': "My magic is older than the tower sage's dusty tomes. I draw power from the earth itself.",
-                    'swamp': "This marsh is my domain. Every creature here serves me, every shadow obeys my command.",
-                    'power': "Power flows from understanding the true nature of things. The sage's light magic is but half the truth.",
-                    'shadow': "Shadow and light are two sides of the same coin. One cannot exist without the other.",
-                    'nature': "Nature is neither good nor evil - it simply is. I embrace all aspects of the natural world.",
-                    'sage': "Aldrich clings to his narrow view of magic. He fears what he does not understand.",
-                    'crystal': "His precious crystal is a crutch for the weak. True power comes from within.",
-                    'bye': "Leave my domain, but remember - nature has many faces, and not all are kind."
-                },
-                initialKeywords: ['name', 'job', 'magic', 'power']
-            },
-            
-            'Merchant Theron': {
-                name: 'Merchant Theron',
-                job: 'Traveling Trader',
-                appearance: 'merchant',
-                responses: {
-                    'name': "I am Theron, a humble merchant who travels the roads of Britannia seeking profit and adventure.",
-                    'job': "I buy and sell goods across the realm. Fine weapons, rare gems, magical reagents - I trade in all.",
-                    'trade': "Good business requires trust and fair dealing. I've built my reputation over many years of honest trade.",
-                    'goods': "I carry weapons from the city forges, gems from the desert mines, and herbs from the forest depths.",
-                    'gem': "The desert caves yield beautiful gems - rubies, sapphires, emeralds. Each worth a king's ransom.",
-                    'weapon': "Fine blades fetch good prices. The blacksmith Gareth crafts the best weapons I've ever seen.",
-                    'herb': "Magical herbs grow in the Whispering Woods. The wise know their properties and pay well for them.",
-                    'road': "The roads grow dangerous. I've seen strange creatures and unexplained lights. Bad for business.",
-                    'profit': "A wise merchant knows when to buy and when to sell. Information is often more valuable than gold.",
-                    'bye': "Farewell! If thou dost find any rare items in thy travels, remember old Theron will pay well."
-                },
-                initialKeywords: ['name', 'job', 'trade', 'goods']
+            {
+                id: "tower",
+                name: "Mystical Tower",
+                label: "🏰 Mystical Tower",
+                color: 0x5b5e8c,
+                center: { x: 0, y: 0, z: 60 },
+                size: { x: 80, y: 0, z: 80 },
+                altitude: 0.1,
+                buildingCountRange: [1, 2],
+                buildingTemplates: [
+                    { file: "tower_main.glb", label: "Arcane Spire", scale: 1.4, spacing: 0, yOffset: 0 },
+                    { file: "tower_library.glb", label: "Sage Library", scale: 1.1, spacing: 20 }
+                ],
+                decorations: { type: "arcane", count: 24 }
             }
-        };
-        
-        // Check WebGL support
-        function checkWebGL() {
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                return !!gl;
-            } catch(e) {
-                return false;
-            }
-        }
-        
-        function updateLoadingProgress(text) {
-            const progressEl = document.getElementById('loadingProgress');
-            if (progressEl) {
-                progressEl.textContent = text;
-            }
-            console.log("📍", text);
-        }
-        
-        function showError(message) {
-            document.getElementById('loadingScreen').style.display = 'none';
-            document.getElementById('errorScreen').style.display = 'block';
-            document.getElementById('errorMessage').textContent = message;
-            console.error("❌ Game Error:", message);
-        }
+        ];
 
-        function toggleGameUI(forceState) {
-            const panel = document.getElementById('gameUI');
-            const toggleButton = document.getElementById('toggleUI');
-
-            if (!panel || !toggleButton) {
-                return;
+        class LoadingOverlay {
+            constructor() {
+                this.overlay = document.getElementById('loadingOverlay');
+                this.statusElement = document.getElementById('loadingText');
+                this.progressBar = document.getElementById('progressBar');
+                this.tipElement = document.getElementById('loadingTip');
+                this.warningTimeout = null;
             }
 
-            if (typeof forceState === 'boolean') {
-                isUIPanelCollapsed = forceState;
-            } else {
-                isUIPanelCollapsed = !isUIPanelCollapsed;
-            }
-
-            panel.classList.toggle('collapsed', isUIPanelCollapsed);
-            toggleButton.setAttribute('aria-expanded', (!isUIPanelCollapsed).toString());
-            toggleButton.textContent = isUIPanelCollapsed ? '+' : '−';
-            const label = isUIPanelCollapsed ? 'Expand information panel' : 'Collapse information panel';
-            toggleButton.setAttribute('aria-label', label);
-            toggleButton.setAttribute('title', label);
-        }
-
-        const toggleUIButton = document.getElementById('toggleUI');
-        if (toggleUIButton) {
-            toggleUIButton.addEventListener('click', () => toggleGameUI());
-        }
-
-        if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
-            toggleGameUI(true);
-        }
-        
-        // Dialogue System Functions
-        function openDialogue(npc) {
-            currentNPC = npc;
-            isDialogueOpen = true;
-            
-            document.getElementById('dialogueBox').style.display = 'block';
-            document.getElementById('npcName').textContent = npc.data.name;
-            document.getElementById('dialogueText').textContent = `Greetings, traveler. I am ${npc.data.name}.`;
-            
-            showKeywords(npc.data.initialKeywords || ['name', 'job', 'bye']);
-            
-            // Hide interaction hint
-            document.getElementById('interactionHint').style.display = 'none';
-        }
-        
-        function closeDialogue() {
-            currentNPC = null;
-            isDialogueOpen = false;
-            document.getElementById('dialogueBox').style.display = 'none';
-        }
-        
-        function showKeywords(keywords) {
-            const container = document.getElementById('keywordContainer');
-            container.innerHTML = '';
-            
-            keywords.forEach(keyword => {
-                const btn = document.createElement('div');
-                btn.className = 'keyword';
-                btn.textContent = keyword.toUpperCase();
-                btn.onclick = () => speakKeyword(keyword);
-                container.appendChild(btn);
-            });
-        }
-        
-        function speakKeyword(keyword) {
-            if (!currentNPC || !currentNPC.data.responses[keyword]) {
-                document.getElementById('dialogueText').textContent = "I do not understand thy words.";
-                return;
-            }
-            
-            const response = currentNPC.data.responses[keyword];
-            document.getElementById('dialogueText').textContent = response;
-            
-            // Show related keywords based on response content
-            const allKeywords = Object.keys(currentNPC.data.responses);
-            const relatedKeywords = allKeywords.filter(k => {
-                return response.toLowerCase().includes(k) || k === 'bye';
-            });
-            
-            // Always include bye and add some random relevant keywords
-            const keywordsToShow = [...new Set([...relatedKeywords, 'bye'])].slice(0, 6);
-            showKeywords(keywordsToShow);
-        }
-        
-        function loadBabylonJS() {
-            updateLoadingProgress("Checking WebGL support...");
-            
-            if (!checkWebGL()) {
-                showError("WebGL is not supported in this browser. Please use Chrome, Firefox, Safari, or Edge.");
-                return;
-            }
-            
-            updateLoadingProgress("Loading enhanced 3D engine...");
-            
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.33.1/babylon.min.js';
-            
-            script.onload = function() {
-                updateLoadingProgress("3D engine loaded successfully!");
-                console.log("✅ Babylon.js 6.33.1 loaded");
-                setTimeout(initializeEnhancedGame, 500);
-            };
-            
-            script.onerror = function() {
-                console.warn("❌ Failed to load from primary CDN, trying fallback...");
-                const altScript = document.createElement('script');
-                altScript.src = 'https://cdn.babylonjs.com/babylon.js';
-                
-                altScript.onload = function() {
-                    updateLoadingProgress("3D engine loaded (fallback)!");
-                    console.log("✅ Babylon.js loaded from fallback CDN");
-                    setTimeout(initializeEnhancedGame, 500);
-                };
-                
-                altScript.onerror = function() {
-                    showError("Failed to load 3D engine. Please check your internet connection and try again.");
-                };
-                
-                document.head.appendChild(altScript);
-            };
-            
-            document.head.appendChild(script);
-        }
-        
-        function createNPC(scene, name, position, shadowGenerator) {
-            const npcData = NPCDatabase[name];
-            if (!npcData) return null;
-            
-            // Create NPC container
-            const npc = new BABYLON.Mesh(`npc_${name}`, scene);
-            npc.position = position;
-            npc.data = npcData;
-            
-            // Create NPC appearance based on type
-            let bodyColor, headColor, accessoryColor;
-            switch (npcData.appearance) {
-                case 'guard':
-                    bodyColor = new BABYLON.Color3(0.3, 0.3, 0.7); // Blue armor
-                    headColor = new BABYLON.Color3(0.8, 0.7, 0.6); // Skin
-                    accessoryColor = new BABYLON.Color3(0.6, 0.6, 0.7); // Silver helmet
-                    break;
-                case 'blacksmith':
-                    bodyColor = new BABYLON.Color3(0.4, 0.2, 0.1); // Brown leather
-                    headColor = new BABYLON.Color3(0.9, 0.7, 0.5); // Tanned skin
-                    accessoryColor = new BABYLON.Color3(0.2, 0.2, 0.2); // Black apron
-                    break;
-                case 'innkeeper':
-                    bodyColor = new BABYLON.Color3(0.6, 0.4, 0.2); // Brown dress
-                    headColor = new BABYLON.Color3(0.9, 0.8, 0.7); // Fair skin
-                    accessoryColor = new BABYLON.Color3(0.8, 0.8, 0.9); // White apron
-                    break;
-                case 'sage':
-                    bodyColor = new BABYLON.Color3(0.2, 0.1, 0.4); // Purple robes
-                    headColor = new BABYLON.Color3(0.9, 0.9, 0.9); // Pale skin
-                    accessoryColor = new BABYLON.Color3(0.8, 0.7, 0.3); // Golden staff
-                    break;
-                case 'witch':
-                    bodyColor = new BABYLON.Color3(0.1, 0.1, 0.1); // Black robes
-                    headColor = new BABYLON.Color3(0.7, 0.8, 0.7); // Pale green skin
-                    accessoryColor = new BABYLON.Color3(0.2, 0.4, 0.1); // Dark green hood
-                    break;
-                case 'merchant':
-                    bodyColor = new BABYLON.Color3(0.6, 0.3, 0.1); // Rich brown
-                    headColor = new BABYLON.Color3(0.8, 0.6, 0.4); // Merchant tan
-                    accessoryColor = new BABYLON.Color3(0.8, 0.6, 0.2); // Gold trim
-                    break;
-                default:
-                    bodyColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-                    headColor = new BABYLON.Color3(0.8, 0.7, 0.6);
-                    accessoryColor = new BABYLON.Color3(0.6, 0.6, 0.6);
-            }
-            
-            // Create materials
-            const bodyMaterial = new BABYLON.StandardMaterial(`${name}_body`, scene);
-            bodyMaterial.diffuseColor = bodyColor;
-            bodyMaterial.ambientColor = bodyColor.scale(0.55);
-            bodyMaterial.freeze();
-
-            const headMaterial = new BABYLON.StandardMaterial(`${name}_head`, scene);
-            headMaterial.diffuseColor = headColor;
-            headMaterial.ambientColor = headColor.scale(0.5);
-            headMaterial.freeze();
-
-            const accessoryMaterial = new BABYLON.StandardMaterial(`${name}_accessory`, scene);
-            accessoryMaterial.diffuseColor = accessoryColor;
-            accessoryMaterial.ambientColor = accessoryColor.scale(0.6);
-            accessoryMaterial.freeze();
-            
-            // Create NPC body parts
-            const head = BABYLON.MeshBuilder.CreateSphere(`${name}_head`, {diameter: 0.8}, scene);
-            head.position.y = 2.6;
-            head.parent = npc;
-            head.material = headMaterial;
-            
-            const body = BABYLON.MeshBuilder.CreateCylinder(`${name}_body`, {height: 1.5, diameter: 0.8}, scene);
-            body.position.y = 1.5;
-            body.parent = npc;
-            body.material = bodyMaterial;
-            
-            const leftArm = BABYLON.MeshBuilder.CreateCylinder(`${name}_leftArm`, {height: 1.2, diameter: 0.25}, scene);
-            leftArm.position.set(-0.6, 1.8, 0);
-            leftArm.rotation.z = Math.PI / 6;
-            leftArm.parent = npc;
-            leftArm.material = headMaterial;
-            
-            const rightArm = BABYLON.MeshBuilder.CreateCylinder(`${name}_rightArm`, {height: 1.2, diameter: 0.25}, scene);
-            rightArm.position.set(0.6, 1.8, 0);
-            rightArm.rotation.z = -Math.PI / 6;
-            rightArm.parent = npc;
-            rightArm.material = headMaterial;
-            
-            const leftLeg = BABYLON.MeshBuilder.CreateCylinder(`${name}_leftLeg`, {height: 1.4, diameter: 0.3}, scene);
-            leftLeg.position.set(-0.25, 0.7, 0);
-            leftLeg.parent = npc;
-            leftLeg.material = bodyMaterial;
-            
-            const rightLeg = BABYLON.MeshBuilder.CreateCylinder(`${name}_rightLeg`, {height: 1.4, diameter: 0.3}, scene);
-            rightLeg.position.set(0.25, 0.7, 0);
-            rightLeg.parent = npc;
-            rightLeg.material = bodyMaterial;
-            
-            // Add character-specific accessories
-            if (npcData.appearance === 'guard') {
-                const helmet = BABYLON.MeshBuilder.CreateSphere(`${name}_helmet`, {diameter: 0.9}, scene);
-                helmet.position.y = 2.7;
-                helmet.scaling.y = 0.8;
-                helmet.parent = npc;
-                helmet.material = accessoryMaterial;
-                
-                const sword = BABYLON.MeshBuilder.CreateCylinder(`${name}_sword`, {height: 0.8, diameter: 0.05}, scene);
-                sword.position.set(0.4, 1.2, -0.2);
-                sword.rotation.z = -Math.PI / 4;
-                sword.parent = npc;
-                sword.material = accessoryMaterial;
-            } else if (npcData.appearance === 'sage') {
-                const hat = BABYLON.MeshBuilder.CreateCylinder(`${name}_hat`, {height: 0.8, diameterTop: 0.2, diameterBottom: 0.6}, scene);
-                hat.position.y = 3.2;
-                hat.parent = npc;
-                hat.material = accessoryMaterial;
-                
-                const staff = BABYLON.MeshBuilder.CreateCylinder(`${name}_staff`, {height: 2.5, diameter: 0.05}, scene);
-                staff.position.set(0.7, 1.8, 0);
-                staff.parent = npc;
-                staff.material = accessoryMaterial;
-            } else if (npcData.appearance === 'witch') {
-                const hood = BABYLON.MeshBuilder.CreateSphere(`${name}_hood`, {diameter: 1.2}, scene);
-                hood.position.y = 2.8;
-                hood.scaling.y = 0.6;
-                hood.parent = npc;
-                hood.material = accessoryMaterial;
-            }
-            
-            // Add to shadows
-            shadowGenerator.getShadowMap().renderList.push(npc, head, body);
-            
-            // Simple idle animation
-            const idleAnimation = new BABYLON.Animation(`${name}_idle`, "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-            const idleKeys = [];
-            idleKeys.push({frame: 0, value: 0});
-            idleKeys.push({frame: 90, value: Math.PI / 4});
-            idleKeys.push({frame: 180, value: 0});
-            idleKeys.push({frame: 270, value: -Math.PI / 4});
-            idleKeys.push({frame: 360, value: 0});
-            idleAnimation.setKeys(idleKeys);
-            npc.animations = [idleAnimation];
-            scene.beginAnimation(npc, 0, 360, true);
-            
-            gameNPCs.push(npc);
-            return npc;
-        }
-        
-        function initializeEnhancedGame() {
-            try {
-                updateLoadingProgress("Initializing enhanced 3D world...");
-                
-                if (typeof BABYLON === 'undefined') {
-                    throw new Error("Babylon.js library not loaded");
+            setStatus(message) {
+                if (this.statusElement) {
+                    this.statusElement.textContent = message;
                 }
-                
-                const canvas = document.getElementById('gameCanvas');
-                if (!canvas) {
-                    throw new Error("Canvas element not found");
+            }
+
+            setProgress(value) {
+                if (this.progressBar) {
+                    const clamped = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+                    this.progressBar.style.width = `${clamped}%`;
+                }
+            }
+
+            show() {
+                if (this.overlay) {
+                    this.overlay.classList.remove('hidden');
+                }
+            }
+
+            hide() {
+                if (this.overlay) {
+                    this.overlay.classList.add('hidden');
+                }
+            }
+
+            reportWarning(message) {
+                if (!this.statusElement) {
+                    return;
                 }
 
-                // Ensure the canvas has layout size even while hidden behind the loading screen
-                canvas.style.display = 'block';
-                canvas.style.visibility = 'hidden';
-                
-                console.log("✅ Creating enhanced Babylon engine...");
-                const engine = new BABYLON.Engine(canvas, true, {
-                    antialias: true,
-                    powerPreference: "high-performance",
-                    stencil: true,
-                    alpha: false,
-                    premultipliedAlpha: false
+                this.statusElement.textContent = message;
+                if (this.warningTimeout) {
+                    window.clearTimeout(this.warningTimeout);
+                }
+                this.warningTimeout = window.setTimeout(() => {
+                    if (this.statusElement) {
+                        this.statusElement.textContent = 'Continuing realm assembly...';
+                    }
+                }, 2400);
+            }
+        }
+
+        class AssetLoader {
+            constructor(loadingOverlay) {
+                this.loadingOverlay = loadingOverlay;
+                this.manager = new THREE.LoadingManager();
+                this.manager.onStart = () => {
+                    this.loadingOverlay.setStatus('Summoning realm assets...');
+                    this.loadingOverlay.setProgress(3);
+                };
+                this.manager.onProgress = (url, loaded, total) => {
+                    const percent = total ? (loaded / total) * 100 : Math.min(99, loaded * 10);
+                    this.loadingOverlay.setProgress(percent);
+                    this.loadingOverlay.setStatus(`Loading models ${loaded}/${total || '?'}...`);
+                };
+                this.manager.onLoad = () => {
+                    this.loadingOverlay.setStatus('Finalizing structures...');
+                    this.loadingOverlay.setProgress(100);
+                };
+                this.manager.onError = (url) => {
+                    console.warn('Unable to load asset:', url);
+                    this.loadingOverlay.reportWarning(`Asset missing: ${this.trimBase(url)}`);
+                };
+                this.gltfLoader = new GLTFLoader(this.manager);
+                const dracoLoader = new DRACOLoader(this.manager);
+                dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.1/examples/jsm/libs/draco/');
+                this.gltfLoader.setDRACOLoader(dracoLoader);
+                this.cache = new Map();
+            }
+
+            trimBase(url) {
+                if (!url) {
+                    return '';
+                }
+                return url.startsWith(MODEL_BASE_URL) ? url.slice(MODEL_BASE_URL.length) : url;
+            }
+
+            resolveUrl(relativePath) {
+                if (!relativePath) {
+                    return MODEL_BASE_URL;
+                }
+                return relativePath.startsWith('http') ? relativePath : `${MODEL_BASE_URL}${relativePath}`;
+            }
+
+            async loadModel(template = {}) {
+                const relativePath = template.file || '';
+                const cacheKey = relativePath;
+                if (cacheKey && this.cache.has(cacheKey)) {
+                    return this.cloneScene(this.cache.get(cacheKey), template);
+                }
+
+                if (!relativePath) {
+                    return this.createFallback(template);
+                }
+
+                const url = this.resolveUrl(relativePath);
+                try {
+                    const gltf = await this.loadGLTF(url);
+                    this.cache.set(cacheKey, gltf.scene);
+                    return this.cloneScene(gltf.scene, template);
+                } catch (error) {
+                    console.warn(`Falling back to primitive for ${relativePath}`, error);
+                    this.loadingOverlay.reportWarning(`Using placeholder for ${template.label || this.trimBase(relativePath)}`);
+                    return this.createFallback(template, url);
+                }
+            }
+
+            loadGLTF(url) {
+                return new Promise((resolve, reject) => {
+                    this.gltfLoader.load(url, resolve, undefined, (err) => reject(err));
                 });
+            }
 
-                if (engine.getCaps && engine.getCaps().srgbSupport && BABYLON.Constants && typeof BABYLON.Constants.OUTPUT_COLOR_SPACE_SRGB !== 'undefined') {
-                    engine.outputColorSpace = BABYLON.Constants.OUTPUT_COLOR_SPACE_SRGB;
-                }
-
-                const gl = engine._gl;
-                if (gl && typeof gl.drawingBufferColorSpace !== 'undefined') {
-                    try {
-                        gl.drawingBufferColorSpace = "srgb";
-                    } catch (err) {
-                        console.warn("⚠️ Unable to force sRGB drawing buffer:", err);
-                    }
-                }
-
-                canvas.style.backgroundColor = '#000';
-
-                const applyHardwareScaling = () => {
-                    const renderingCanvas = engine.getRenderingCanvas();
-                    if (!renderingCanvas) {
-                        return;
-                    }
-
-                    const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
-                    const cssWidth = renderingCanvas.clientWidth;
-                    const cssHeight = renderingCanvas.clientHeight;
-                    const clientWidth = cssWidth || window.innerWidth || renderingCanvas.width || 1;
-                    const clientHeight = cssHeight || window.innerHeight || renderingCanvas.height || 1;
-                    const targetWidth = Math.max(1, Math.floor(clientWidth * pixelRatio));
-                    const targetHeight = Math.max(1, Math.floor(clientHeight * pixelRatio));
-
-                    if (renderingCanvas.width !== targetWidth) {
-                        renderingCanvas.width = targetWidth;
-                    }
-                    if (renderingCanvas.height !== targetHeight) {
-                        renderingCanvas.height = targetHeight;
-                    }
-
-                    engine.setHardwareScalingLevel(1 / pixelRatio);
-                    renderingCanvas.style.imageRendering = 'auto';
-                    if (cssWidth && cssHeight) {
-                        engine.resize();
-                    }
-                };
-
-                applyHardwareScaling();
-                
-                updateLoadingProgress("Creating enhanced scene...");
-                const scene = new BABYLON.Scene(engine);
-                currentScene = scene;
-                scene.clearColor = new BABYLON.Color3(0.25, 0.45, 0.68);
-                scene.ambientColor = new BABYLON.Color3(0.25, 0.3, 0.35);
-                scene.fogEnabled = false;
-                scene.autoClear = true;
-                scene.autoClearDepthAndStencil = true;
-
-                const imageProcessing = scene.imageProcessingConfiguration;
-                if (imageProcessing) {
-                    if ('applyByPostProcess' in imageProcessing) {
-                        imageProcessing.applyByPostProcess = false;
-                    }
-                    imageProcessing.toneMappingEnabled = false;
-                    if ('toneMappingType' in imageProcessing) {
-                        imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
-                    }
-                    imageProcessing.exposure = 1.0;
-                    if ('gamma' in imageProcessing) {
-                        imageProcessing.gamma = 1.0;
-                    }
-                    imageProcessing.contrast = 1.05;
-                }
-
-                const gammaSlider = document.getElementById('gammaSlider');
-                const exposureSlider = document.getElementById('exposureSlider');
-                const gammaValueLabel = document.getElementById('gammaValue');
-                const exposureValueLabel = document.getElementById('exposureValue');
-
-                const gammaSettings = {
-                    gamma: gammaSlider ? parseFloat(gammaSlider.value) || 2.2 : 2.2,
-                    exposure: exposureSlider ? parseFloat(exposureSlider.value) || 1.1 : 1.1,
-                    whitePoint: 1.4
-                };
-
-                function setSceneGamma(value) {
-                    const numericValue = parseFloat(value);
-                    if (!isNaN(numericValue)) {
-                        gammaSettings.gamma = Math.min(3.5, Math.max(0.8, numericValue));
-                    }
-                    if (gammaValueLabel) {
-                        gammaValueLabel.textContent = gammaSettings.gamma.toFixed(2);
-                    }
-                    if (gammaSlider && Math.abs(parseFloat(gammaSlider.value) - gammaSettings.gamma) > 0.001) {
-                        gammaSlider.value = gammaSettings.gamma.toString();
-                    }
-                    return gammaSettings.gamma;
-                }
-
-                function setSceneExposure(value) {
-                    const numericValue = parseFloat(value);
-                    if (!isNaN(numericValue)) {
-                        gammaSettings.exposure = Math.min(3.0, Math.max(0.2, numericValue));
-                    }
-                    if (exposureValueLabel) {
-                        exposureValueLabel.textContent = gammaSettings.exposure.toFixed(2);
-                    }
-                    if (exposureSlider && Math.abs(parseFloat(exposureSlider.value) - gammaSettings.exposure) > 0.001) {
-                        exposureSlider.value = gammaSettings.exposure.toString();
-                    }
-                    return gammaSettings.exposure;
-                }
-
-                function setSceneWhitePoint(value) {
-                    const numericValue = parseFloat(value);
-                    if (!isNaN(numericValue)) {
-                        gammaSettings.whitePoint = Math.min(4.0, Math.max(0.1, numericValue));
-                    }
-                    return gammaSettings.whitePoint;
-                }
-
-                if (gammaSlider) {
-                    gammaSlider.addEventListener('input', (event) => setSceneGamma(event.target.value));
-                    gammaSlider.addEventListener('change', (event) => setSceneGamma(event.target.value));
-                }
-
-                if (exposureSlider) {
-                    exposureSlider.addEventListener('input', (event) => setSceneExposure(event.target.value));
-                    exposureSlider.addEventListener('change', (event) => setSceneExposure(event.target.value));
-                }
-
-                setSceneGamma(gammaSettings.gamma);
-                setSceneExposure(gammaSettings.exposure);
-
-                window.BritanniaDisplaySettings = window.BritanniaDisplaySettings || {};
-                window.BritanniaDisplaySettings.setGamma = setSceneGamma;
-                window.BritanniaDisplaySettings.setExposure = setSceneExposure;
-                window.BritanniaDisplaySettings.setWhitePoint = setSceneWhitePoint;
-                window.BritanniaDisplaySettings.getSettings = () => Object.assign({}, gammaSettings);
-
-                if (!BABYLON.Effect.ShadersStore["gammaCorrectionFragmentShader"]) {
-                    BABYLON.Effect.ShadersStore["gammaCorrectionFragmentShader"] = `
-                        precision highp float;
-                        varying vec2 vUV;
-                        uniform sampler2D textureSampler;
-                        uniform float gamma;
-                        uniform float exposure;
-                        uniform float whitePoint;
-
-                        vec3 reinhardToneMap(vec3 color, float whitePointValue, float exposureValue) {
-                            float adjustedWhitePoint = max(whitePointValue, 0.1);
-                            float adjustedExposure = max(exposureValue, 0.0);
-                            vec3 mapped = color * adjustedExposure;
-                            return (mapped * (1.0 + mapped / (adjustedWhitePoint * adjustedWhitePoint))) / (1.0 + mapped);
+            cloneScene(scene, template) {
+                const clone = SkeletonUtils.clone(scene);
+                clone.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach((material) => this.prepareMaterial(material));
+                        } else {
+                            this.prepareMaterial(child.material);
                         }
+                    }
+                });
+                clone.userData.sourceUrl = this.resolveUrl(template?.file || '');
+                return clone;
+            }
 
-                        void main(void) {
-                            vec4 sceneColor = texture2D(textureSampler, vUV);
-                            vec3 toneMapped = reinhardToneMap(max(sceneColor.rgb, vec3(0.0)), whitePoint, exposure);
-                            vec3 srgb = pow(toneMapped, vec3(1.0 / max(gamma, 0.0001)));
-                            gl_FragColor = vec4(clamp(srgb, 0.0, 1.0), sceneColor.a);
-                        }
-                    `;
+            prepareMaterial(material) {
+                if (!material) {
+                    return;
                 }
-                
-                updateLoadingProgress("Setting up enhanced camera system...");
-                const defaultCameraHeight = 15;
-                const defaultCameraDistance = 40;
-                const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, defaultCameraHeight, -defaultCameraDistance), scene);
-                camera.setTarget(BABYLON.Vector3.Zero());
+                material.needsUpdate = true;
+                if (material.map && material.map.isTexture) {
+                    if ('colorSpace' in material.map) {
+                        material.map.colorSpace = THREE.SRGBColorSpace;
+                    }
+                    material.map.anisotropy = 4;
+                }
+            }
 
-                const gammaCorrectionPostProcess = new BABYLON.PostProcess(
-                    "gammaCorrection",
-                    "gammaCorrection",
-                    ["gamma", "exposure", "whitePoint"],
-                    null,
-                    1.0,
-                    camera
+            createFallback(template = {}, url = null) {
+                const group = new THREE.Group();
+                const baseColor = template.fallbackColor || 0xb9a67a;
+                const accentColor = template.accentColor || 0x5e3a1e;
+
+                const base = new THREE.Mesh(
+                    new THREE.BoxGeometry(6, 4, 6),
+                    new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 })
                 );
-                gammaCorrectionPostProcess.onApply = function(effect) {
-                    effect.setFloat("gamma", gammaSettings.gamma);
-                    effect.setFloat("exposure", gammaSettings.exposure);
-                    effect.setFloat("whitePoint", gammaSettings.whitePoint);
-                };
+                base.position.y = 2;
+                base.castShadow = true;
+                base.receiveShadow = true;
 
-                // Camera controls
-                let isMouseDown = false;
-                let lastMouseX = 0;
-                let lastMouseY = 0;
-                let alpha = Math.PI;
-                let distance = defaultCameraDistance;
-                let currentCameraHeight = defaultCameraHeight;
-                const cameraTargetOffset = new BABYLON.Vector3(0, 2.8, 0);
-                const cameraTarget = new BABYLON.Vector3();
-                const desiredCameraPosition = new BABYLON.Vector3();
-                
-                canvas.addEventListener('mousedown', function(event) {
-                    if (event.button === 0 && !isDialogueOpen) {
-                        isMouseDown = true;
-                        lastMouseX = event.clientX;
-                        lastMouseY = event.clientY;
-                        canvas.style.cursor = "grabbing";
-                        event.preventDefault();
-                    }
-                });
-                
-                canvas.addEventListener('mouseup', function() {
-                    isMouseDown = false;
-                    canvas.style.cursor = "grab";
-                });
-                
-                canvas.addEventListener('mouseleave', function() {
-                    isMouseDown = false;
-                    canvas.style.cursor = "grab";
-                });
-                
-                canvas.addEventListener('mousemove', function(event) {
-                    if (isMouseDown && !isDialogueOpen) {
-                        const deltaX = event.clientX - lastMouseX;
-                        const deltaY = event.clientY - lastMouseY;
-                        
-                        alpha += deltaX * 0.008;
-                        currentCameraHeight = Math.max(8, Math.min(25, currentCameraHeight + deltaY * 0.04));
+                const roof = new THREE.Mesh(
+                    new THREE.ConeGeometry(4.8, 3.5, 4),
+                    new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.6, metalness: 0.08 })
+                );
+                roof.position.y = 5;
+                roof.castShadow = true;
+                roof.receiveShadow = true;
 
-                        syncCameraToPlayer();
+                const chimney = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.4, 0.5, 2, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x3b2b26, roughness: 0.7 })
+                );
+                chimney.position.set(1.2, 4.8, 0.8);
+                chimney.castShadow = true;
+                chimney.receiveShadow = true;
 
-                        lastMouseX = event.clientX;
-                        lastMouseY = event.clientY;
-                    }
-                });
-                
-                canvas.style.cursor = "grab";
-                
-                updateLoadingProgress("Creating enhanced lighting system...");
-                
-                // Enhanced lighting system
-                const ambientLight = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0), scene);
-                ambientLight.intensity = 1.35;
-                ambientLight.diffuse = new BABYLON.Color3(0.9, 0.98, 1.0);
-                ambientLight.specular = new BABYLON.Color3(0.2, 0.22, 0.25);
-                ambientLight.groundColor = new BABYLON.Color3(0.45, 0.5, 0.55);
-
-                const sunLight = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-1, -1, -1), scene);
-                sunLight.intensity = 1.2;
-                sunLight.diffuse = new BABYLON.Color3(1.0, 0.96, 0.88);
-                sunLight.specular = new BABYLON.Color3(1.0, 0.94, 0.85);
-                sunLight.shadowMinZ = -20;
-                sunLight.shadowMaxZ = 60;
-                
-                // Enhanced shadows
-                const shadowGenerator = new BABYLON.ShadowGenerator(2048, sunLight);
-                shadowGenerator.useExponentialShadowMap = true;
-                shadowGenerator.bias = 0.0005;
-                shadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
-                shadowGenerator.usePercentageCloserFiltering = true;
-                shadowGenerator.darkness = 0.25;
-                
-                updateLoadingProgress("Creating diverse terrain regions...");
-                
-                // Main ground
-                const ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 100, height: 100}, scene);
-                const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
-                groundMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
-                groundMaterial.ambientColor = groundMaterial.diffuseColor.scale(0.6);
-                ground.material = groundMaterial;
-                ground.receiveShadows = true;
-                
-                // Forest region
-                const forestGround = BABYLON.MeshBuilder.CreateGround("forestGround", {width: 30, height: 25}, scene);
-                forestGround.position.set(-30, 0.01, 20);
-                const forestMaterial = new BABYLON.StandardMaterial("forestMat", scene);
-                forestMaterial.diffuseColor = new BABYLON.Color3(0.15, 0.4, 0.15);
-                forestMaterial.ambientColor = forestMaterial.diffuseColor.scale(0.65);
-                forestGround.material = forestMaterial;
-                forestGround.receiveShadows = true;
-                
-                // Desert region
-                const desertGround = BABYLON.MeshBuilder.CreateGround("desertGround", {width: 25, height: 25}, scene);
-                desertGround.position.set(30, 0.01, -25);
-                const desertMaterial = new BABYLON.StandardMaterial("desertMat", scene);
-                desertMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.7, 0.4);
-                desertMaterial.ambientColor = desertMaterial.diffuseColor.scale(0.65);
-                desertGround.material = desertMaterial;
-                desertGround.receiveShadows = true;
-                
-                // Swamp region
-                const swampGround = BABYLON.MeshBuilder.CreateGround("swampGround", {width: 20, height: 20}, scene);
-                swampGround.position.set(-35, 0.01, -25);
-                const swampMaterial = new BABYLON.StandardMaterial("swampMat", scene);
-                swampMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.4, 0.2);
-                swampMaterial.ambientColor = swampMaterial.diffuseColor.scale(0.6);
-                swampGround.material = swampMaterial;
-                swampGround.receiveShadows = true;
-                
-                updateLoadingProgress("Creating heroic knight character...");
-                
-                // Create enhanced player character
-                const player = new BABYLON.Mesh("enhancedKnight", scene);
-                
-                // Character materials
-                const skinMaterial = new BABYLON.StandardMaterial("skinMat", scene);
-                skinMaterial.diffuseColor = new BABYLON.Color3(0.95, 0.8, 0.7);
-                skinMaterial.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-                skinMaterial.ambientColor = skinMaterial.diffuseColor.scale(0.55);
-                skinMaterial.freeze();
-
-                const armorMaterial = new BABYLON.StandardMaterial("armorMat", scene);
-                armorMaterial.diffuseColor = new BABYLON.Color3(0.4, 0.5, 0.8);
-                armorMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
-                armorMaterial.specularPower = 256;
-                armorMaterial.ambientColor = armorMaterial.diffuseColor.scale(0.5);
-                armorMaterial.freeze();
-
-                const metalMaterial = new BABYLON.StandardMaterial("metalMat", scene);
-                metalMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.8);
-                metalMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
-                metalMaterial.specularPower = 128;
-                metalMaterial.ambientColor = metalMaterial.diffuseColor.scale(0.45);
-                metalMaterial.freeze();
-                
-                // Head
-                const head = BABYLON.MeshBuilder.CreateSphere("head", {diameter: 1}, scene);
-                head.position.y = 3.2;
-                head.parent = player;
-                head.material = skinMaterial;
-                
-                // Helmet
-                const helmet = BABYLON.MeshBuilder.CreateSphere("helmet", {diameter: 1.1, segments: 16}, scene);
-                helmet.position.y = 3.3;
-                helmet.scaling.y = 0.8;
-                helmet.parent = player;
-                helmet.material = metalMaterial;
-                
-                // Helmet plume
-                const plume = BABYLON.MeshBuilder.CreateCylinder("plume", {height: 0.8, diameter: 0.1}, scene);
-                plume.position.set(0, 3.9, 0);
-                plume.parent = player;
-                const plumeMaterial = new BABYLON.StandardMaterial("plumeMat", scene);
-                plumeMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.2, 0.2);
-                plumeMaterial.ambientColor = plumeMaterial.diffuseColor.scale(0.6);
-                plume.material = plumeMaterial;
-                
-                // Torso
-                const torso = BABYLON.MeshBuilder.CreateCylinder("torso", {height: 1.8, diameter: 1.2, tessellation: 12}, scene);
-                torso.position.y = 2;
-                torso.parent = player;
-                torso.material = armorMaterial;
-                
-                // Arms
-                const leftArm = BABYLON.MeshBuilder.CreateCylinder("leftArm", {height: 1.4, diameter: 0.35}, scene);
-                leftArm.position.set(-0.75, 2, 0);
-                leftArm.rotation.z = Math.PI / 8;
-                leftArm.parent = player;
-                leftArm.material = skinMaterial;
-                
-                const rightArm = BABYLON.MeshBuilder.CreateCylinder("rightArm", {height: 1.4, diameter: 0.35}, scene);
-                rightArm.position.set(0.75, 2, 0);
-                rightArm.rotation.z = -Math.PI / 8;
-                rightArm.parent = player;
-                rightArm.material = skinMaterial;
-                
-                // Legs
-                const leftLeg = BABYLON.MeshBuilder.CreateCylinder("leftLeg", {height: 1.6, diameter: 0.45}, scene);
-                leftLeg.position.set(-0.3, 0.8, 0);
-                leftLeg.parent = player;
-                leftLeg.material = armorMaterial;
-                
-                const rightLeg = BABYLON.MeshBuilder.CreateCylinder("rightLeg", {height: 1.6, diameter: 0.45}, scene);
-                rightLeg.position.set(0.3, 0.8, 0);
-                rightLeg.parent = player;
-                rightLeg.material = armorMaterial;
-                
-                // Cape
-                const cape = BABYLON.MeshBuilder.CreateBox("cape", {width: 1.6, height: 2.8, depth: 0.1}, scene);
-                cape.position.set(0, 1.9, -0.7);
-                cape.parent = player;
-                const capeMaterial = new BABYLON.StandardMaterial("capeMat", scene);
-                capeMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.1, 0.1);
-                capeMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.02, 0.02);
-                capeMaterial.ambientColor = capeMaterial.diffuseColor.scale(0.55);
-                cape.material = capeMaterial;
-                
-                // Sword
-                const sword = BABYLON.MeshBuilder.CreateCylinder("sword", {height: 1.2, diameter: 0.05}, scene);
-                sword.position.set(0.6, 1.5, -0.3);
-                sword.rotation.z = -Math.PI / 4;
-                sword.parent = player;
-                const swordMaterial = new BABYLON.StandardMaterial("swordMat", scene);
-                swordMaterial.diffuseColor = new BABYLON.Color3(0.9, 0.9, 1);
-                swordMaterial.specularColor = new BABYLON.Color3(1, 1, 1);
-                swordMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.2);
-                swordMaterial.ambientColor = swordMaterial.diffuseColor.scale(0.5);
-                sword.material = swordMaterial;
-                
-                // Shield
-                const shield = BABYLON.MeshBuilder.CreateCylinder("shield", {height: 0.1, diameter: 1.2}, scene);
-                shield.position.set(-0.2, 2, -0.8);
-                shield.rotation.x = Math.PI / 6;
-                shield.parent = player;
-                const shieldMaterial = new BABYLON.StandardMaterial("shieldMat", scene);
-                shieldMaterial.diffuseColor = new BABYLON.Color3(0.7, 0.6, 0.2);
-                shieldMaterial.specularColor = new BABYLON.Color3(0.9, 0.8, 0.4);
-                shieldMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.08, 0.02);
-                shieldMaterial.ambientColor = shieldMaterial.diffuseColor.scale(0.55);
-                shield.material = shieldMaterial;
-                
-                // Magical aura
-                const aura = BABYLON.MeshBuilder.CreateTorus("aura", {diameter: 2.5, thickness: 0.05}, scene);
-                aura.position.y = 0.1;
-                aura.parent = player;
-                const auraMaterial = new BABYLON.StandardMaterial("auraMat", scene);
-                auraMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1);
-                auraMaterial.emissiveColor = new BABYLON.Color3(0.2, 0.5, 0.8);
-                auraMaterial.ambientColor = auraMaterial.diffuseColor.scale(0.4);
-                auraMaterial.alpha = 0.3;
-                aura.material = auraMaterial;
-                
-                // Animate aura
-                const auraRotation = new BABYLON.Animation("auraRotation", "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-                const auraKeys = [];
-                auraKeys.push({frame: 0, value: 0});
-                auraKeys.push({frame: 30, value: Math.PI * 2});
-                auraRotation.setKeys(auraKeys);
-                aura.animations = [auraRotation];
-                scene.beginAnimation(aura, 0, 30, true);
-
-                player.position.y = 0;
-
-                function computeDesiredCameraPosition() {
-                    desiredCameraPosition.set(
-                        player.position.x + Math.sin(alpha) * distance,
-                        currentCameraHeight,
-                        player.position.z + Math.cos(alpha) * distance
-                    );
-                }
-
-                function updateCameraTarget() {
-                    cameraTarget.copyFrom(player.position);
-                    cameraTarget.addInPlace(cameraTargetOffset);
-                    camera.setTarget(cameraTarget);
-                }
-
-                function syncCameraToPlayer() {
-                    computeDesiredCameraPosition();
-                    camera.position.copyFrom(desiredCameraPosition);
-                    updateCameraTarget();
-                }
-
-                // Align camera once the player is constructed
-                syncCameraToPlayer();
-
-                // Add to shadows
-                shadowGenerator.getShadowMap().renderList.push(player, head, helmet, torso, cape, sword, shield);
-                
-                updateLoadingProgress("Creating NPCs throughout the realm...");
-                
-                // Create NPCs in various locations
-                createNPC(scene, 'Guard Captain Marcus', new BABYLON.Vector3(2, 0, 2), shadowGenerator);
-                createNPC(scene, 'Blacksmith Gareth', new BABYLON.Vector3(-8, 0, 3), shadowGenerator);
-                createNPC(scene, 'Innkeeper Sarah', new BABYLON.Vector3(8, 0, -5), shadowGenerator);
-                createNPC(scene, 'Sage Aldrich', new BABYLON.Vector3(5, 0, 8), shadowGenerator);
-                createNPC(scene, 'Witch Morgana', new BABYLON.Vector3(-35, 0, -25), shadowGenerator);
-                createNPC(scene, 'Merchant Theron', new BABYLON.Vector3(-2, 0, -8), shadowGenerator);
-                
-                updateLoadingProgress("Building mystical structures...");
-                
-                // Forest trees
-                for (let i = 0; i < 20; i++) {
-                    const tree = BABYLON.MeshBuilder.CreateCylinder("forestTree", {height: 5 + Math.random() * 2, diameter: 0.6}, scene);
-                    tree.position.x = -40 + Math.random() * 20;
-                    tree.position.z = 10 + Math.random() * 20;
-                    tree.position.y = (5 + Math.random() * 2) / 2;
-                    
-                    const treeMaterial = new BABYLON.StandardMaterial("forestTreeMat", scene);
-                    treeMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.15, 0.1);
-                    treeMaterial.ambientColor = treeMaterial.diffuseColor.scale(0.6);
-                    tree.material = treeMaterial;
-                    
-                    const crown = BABYLON.MeshBuilder.CreateSphere("crown", {diameter: 2 + Math.random()}, scene);
-                    crown.position = tree.position.clone();
-                    crown.position.y += 2.5;
-                    const crownMaterial = new BABYLON.StandardMaterial("crownMat", scene);
-                    crownMaterial.diffuseColor = new BABYLON.Color3(0.1, 0.4, 0.1);
-                    crownMaterial.ambientColor = crownMaterial.diffuseColor.scale(0.65);
-                    crown.material = crownMaterial;
-                    
-                    shadowGenerator.getShadowMap().renderList.push(tree, crown);
-                }
-                
-                // Desert cacti
-                for (let i = 0; i < 12; i++) {
-                    const cactus = BABYLON.MeshBuilder.CreateCylinder("cactus", {height: 3 + Math.random(), diameter: 0.4}, scene);
-                    cactus.position.x = 20 + Math.random() * 20;
-                    cactus.position.z = -35 + Math.random() * 20;
-                    cactus.position.y = (3 + Math.random()) / 2;
-                    
-                    const cactusMaterial = new BABYLON.StandardMaterial("cactusMat", scene);
-                    cactusMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
-                    cactusMaterial.ambientColor = cactusMaterial.diffuseColor.scale(0.6);
-                    cactus.material = cactusMaterial;
-                    
-                    shadowGenerator.getShadowMap().renderList.push(cactus);
-                }
-                
-                // Swamp Witch's Hut
-                const swampHut = BABYLON.MeshBuilder.CreateBox("swampHut", {width: 4, height: 3, depth: 4}, scene);
-                swampHut.position.set(-35, 1.5, -25);
-                const hutMaterial = new BABYLON.StandardMaterial("hutMat", scene);
-                hutMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.1);
-                hutMaterial.ambientColor = hutMaterial.diffuseColor.scale(0.6);
-                hutMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.05, 0.02);
-                swampHut.material = hutMaterial;
-                
-                // Mystical Tower
-                const tower = BABYLON.MeshBuilder.CreateCylinder("mysticalTower", {height: 8, diameter: 3}, scene);
-                tower.position.set(5, 4, 5);
-                const towerMaterial = new BABYLON.StandardMaterial("towerMat", scene);
-                towerMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.6);
-                towerMaterial.ambientColor = towerMaterial.diffuseColor.scale(0.55);
-                tower.material = towerMaterial;
-                
-                const towerRoof = BABYLON.MeshBuilder.CreateCylinder("towerRoof", {
-                    height: 2, diameterTop: 0.5, diameterBottom: 3.5
-                }, scene);
-                towerRoof.position.set(5, 9, 5);
-                const roofMaterial = new BABYLON.StandardMaterial("roofMat", scene);
-                roofMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.1, 0.1);
-                roofMaterial.ambientColor = roofMaterial.diffuseColor.scale(0.6);
-                towerRoof.material = roofMaterial;
-                
-                // Magical crystal on tower
-                const crystal = BABYLON.MeshBuilder.CreateBox("crystal", {width: 0.5, height: 1, depth: 0.5}, scene);
-                crystal.position.set(5, 10.5, 5);
-                crystal.rotation.y = Math.PI / 4;
-                const crystalMaterial = new BABYLON.StandardMaterial("crystalMat", scene);
-                crystalMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.3, 1);
-                crystalMaterial.emissiveColor = new BABYLON.Color3(0.4, 0.1, 0.5);
-                crystalMaterial.ambientColor = crystalMaterial.diffuseColor.scale(0.5);
-                crystal.material = crystalMaterial;
-                
-                // Animate crystal
-                const crystalRotationAnim = new BABYLON.Animation("crystalRotation", "rotation.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-                const crystalRotationKeys = [];
-                crystalRotationKeys.push({frame: 0, value: 0});
-                crystalRotationKeys.push({frame: 30, value: Math.PI * 2});
-                crystalRotationAnim.setKeys(crystalRotationKeys);
-                
-                const crystalFloatAnim = new BABYLON.Animation("crystalFloat", "position.y", 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-                const crystalFloatKeys = [];
-                crystalFloatKeys.push({frame: 0, value: 10.5});
-                crystalFloatKeys.push({frame: 30, value: 10.8});
-                crystalFloatKeys.push({frame: 60, value: 10.5});
-                crystalFloatAnim.setKeys(crystalFloatKeys);
-                
-                crystal.animations = [crystalRotationAnim, crystalFloatAnim];
-                scene.beginAnimation(crystal, 0, 30, true);
-                scene.beginAnimation(crystal, 0, 60, true);
-                
-                shadowGenerator.getShadowMap().renderList.push(swampHut, tower, towerRoof);
-                
-                updateLoadingProgress("Creating magical lighting effects...");
-                
-                // Region-specific lights
-                const crystalLight = new BABYLON.PointLight("crystalLight", new BABYLON.Vector3(5, 10.5, 5), scene);
-                crystalLight.diffuse = new BABYLON.Color3(0.8, 0.3, 1);
-                crystalLight.intensity = 2;
-                crystalLight.range = 15;
-                
-                const swampLight = new BABYLON.PointLight("swampLight", new BABYLON.Vector3(-35, 2, -25), scene);
-                swampLight.diffuse = new BABYLON.Color3(0.3, 0.6, 0.2);
-                swampLight.intensity = 1.5;
-                swampLight.range = 12;
-                
-                const desertLight = new BABYLON.PointLight("desertLight", new BABYLON.Vector3(30, 3, -25), scene);
-                desertLight.diffuse = new BABYLON.Color3(1, 0.7, 0.4);
-                desertLight.intensity = 1.2;
-                desertLight.range = 20;
-                
-                updateLoadingProgress("Adding magical particle effects...");
-                
-                // Create simple particle texture
-                function createParticleTexture() {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = canvas.height = 64;
-                    const ctx = canvas.getContext('2d');
-                    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-                    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, 64, 64);
-                    return new BABYLON.Texture(canvas.toDataURL(), scene);
-                }
-                
-                const particleTexture = createParticleTexture();
-                
-                // Crystal particles
-                const crystalParticles = new BABYLON.ParticleSystem("crystalParticles", 1000, scene);
-                crystalParticles.particleTexture = particleTexture;
-                crystalParticles.emitter = crystal;
-                crystalParticles.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
-                crystalParticles.maxEmitBox = new BABYLON.Vector3(0.5, 0, 0.5);
-                crystalParticles.color1 = new BABYLON.Color4(0.8, 0.2, 1.0, 1.0);
-                crystalParticles.color2 = new BABYLON.Color4(1.0, 0.4, 0.8, 1.0);
-                crystalParticles.colorDead = new BABYLON.Color4(0, 0, 0.2, 0.0);
-                crystalParticles.minSize = 0.1;
-                crystalParticles.maxSize = 0.5;
-                crystalParticles.minLifeTime = 1.0;
-                crystalParticles.maxLifeTime = 3.0;
-                crystalParticles.emitRate = 100;
-                crystalParticles.minEmitPower = 1;
-                crystalParticles.maxEmitPower = 3;
-                crystalParticles.updateSpeed = 0.005;
-                crystalParticles.gravity = new BABYLON.Vector3(0, -9.81, 0);
-                crystalParticles.direction1 = new BABYLON.Vector3(-1, 8, -1);
-                crystalParticles.direction2 = new BABYLON.Vector3(1, 8, 1);
-                crystalParticles.start();
-                
-                updateLoadingProgress("Setting up enhanced controls...");
-                
-                // Input handling
-                const keys = {};
-                let isWalking = false;
-                let walkingAnimation = null;
-                let nearestNPC = null;
-                
-                document.addEventListener('keydown', function(event) {
-                    keys[event.code] = true;
-                    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Escape'].includes(event.code)) {
-                        event.preventDefault();
-                    }
-                    
-                    // Handle dialogue controls
-                    if (event.code === 'Escape' && isDialogueOpen) {
-                        closeDialogue();
-                    }
-                });
-                
-                document.addEventListener('keyup', function(event) {
-                    keys[event.code] = false;
-                });
-                
-                // Walking animation
-                function createWalkingAnimation() {
-                    const animationGroup = new BABYLON.AnimationGroup("walkAnimation");
-                    
-                    const bobAnimation = new BABYLON.Animation("playerBob", "position.y", 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-                    const bobKeys = [];
-                    bobKeys.push({frame: 0, value: 0});
-                    bobKeys.push({frame: 15, value: 0.1});
-                    bobKeys.push({frame: 30, value: 0});
-                    bobKeys.push({frame: 45, value: 0.1});
-                    bobKeys.push({frame: 60, value: 0});
-                    bobAnimation.setKeys(bobKeys);
-                    
-                    const swayAnimation = new BABYLON.Animation("playerSway", "rotation.z", 60, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
-                    const swayKeys = [];
-                    swayKeys.push({frame: 0, value: 0});
-                    swayKeys.push({frame: 30, value: 0.05});
-                    swayKeys.push({frame: 60, value: 0});
-                    swayAnimation.setKeys(swayKeys);
-                    
-                    animationGroup.addTargetedAnimation(bobAnimation, player);
-                    animationGroup.addTargetedAnimation(swayAnimation, player);
-                    
-                    return animationGroup;
-                }
-                
-                walkingAnimation = createWalkingAnimation();
-                
-                // Game loop
-                scene.registerBeforeRender(function() {
-                    if (isDialogueOpen) return; // Don't process movement during dialogue
-                    
-                    const speed = 0.2;
-                    let moved = false;
-                    
-                    if (keys['KeyW'] || keys['ArrowUp']) {
-                        player.position.z += speed;
-                        moved = true;
-                    }
-                    if (keys['KeyS'] || keys['ArrowDown']) {
-                        player.position.z -= speed;
-                        moved = true;
-                    }
-                    if (keys['KeyA'] || keys['ArrowLeft']) {
-                        player.position.x -= speed;
-                        moved = true;
-                    }
-                    if (keys['KeyD'] || keys['ArrowRight']) {
-                        player.position.x += speed;
-                        moved = true;
-                    }
-                    
-                    if (keys['Space']) {
-                        keys['Space'] = false;
-                        checkInteractions();
-                    }
-                    
-                    // Handle walking animations
-                    if (moved && !isWalking) {
-                        isWalking = true;
-                        walkingAnimation.play(true);
-                    } else if (!moved && isWalking) {
-                        isWalking = false;
-                        walkingAnimation.stop();
-                        player.position.y = 0;
-                        player.rotation.z = 0;
-                    }
-                    
-                    if (moved) {
-                        // Keep within bounds
-                        player.position.x = Math.max(-45, Math.min(45, player.position.x));
-                        player.position.z = Math.max(-45, Math.min(45, player.position.z));
-                        
-                        // Smooth camera following
-                        if (!isMouseDown) {
-                            computeDesiredCameraPosition();
-                            BABYLON.Vector3.LerpToRef(camera.position, desiredCameraPosition, 0.06, camera.position);
-                        }
-                        updateCameraTarget();
-
-                        updateUI();
-                    }
-
-                    // Check for nearby NPCs
-                    checkNearbyNPCs();
-                    if (!moved) {
-                        updateCameraTarget();
-                    }
-                });
-                
-                function checkNearbyNPCs() {
-                    nearestNPC = null;
-                    let closestDistance = 5; // Maximum interaction distance
-                    
-                    gameNPCs.forEach(npc => {
-                        const distance = BABYLON.Vector3.Distance(player.position, npc.position);
-                        if (distance < closestDistance) {
-                            nearestNPC = npc;
-                            closestDistance = distance;
-                        }
-                    });
-                    
-                    const hintElement = document.getElementById('interactionHint');
-                    if (nearestNPC && !isDialogueOpen) {
-                        hintElement.textContent = `Press SPACE to talk to ${nearestNPC.data.name}`;
-                        hintElement.style.display = 'block';
-                    } else {
-                        hintElement.style.display = 'none';
-                    }
-                }
-                
-                function checkInteractions() {
-                    const x = player.position.x;
-                    const z = player.position.z;
-                    
-                    // Check for NPC interactions first
-                    if (nearestNPC) {
-                        openDialogue(nearestNPC);
-                        return;
-                    }
-                    
-                    // Check for building interactions
-                    if (Math.abs(x + 35) < 4 && Math.abs(z + 25) < 4) {
-                        updateStatus("You see the Witch's Hut. Dark magic emanates from within...");
-                        return;
-                    }
-                    
-                    if (Math.abs(x - 5) < 4 && Math.abs(z - 5) < 4) {
-                        updateStatus("The Mystical Tower stands before you, crystal light dancing above...");
-                        return;
-                    }
-                    
-                    updateStatus("Nothing of interest here...");
-                }
-                
-                function updateUI() {
-                    const posElement = document.getElementById('playerPos');
-                    if (posElement) {
-                        posElement.textContent = Math.round(player.position.x) + ', ' + Math.round(player.position.z);
-                    }
-                    updateRegion();
-                }
-                
-                function updateStatus(text) {
-                    const statusElement = document.getElementById('gameStatus');
-                    if (statusElement) {
-                        statusElement.textContent = text;
-                    }
-                }
-                
-                function updateRegion() {
-                    const x = player.position.x;
-                    const z = player.position.z;
-                    let region = "Central Plains";
-                    
-                    if (x < -25 && z > 10) region = "🌲 Whispering Woods";
-                    else if (x > 20 && z < -15) region = "🏜️ Golden Desert";
-                    else if (x < -25 && z < -15) region = "🐸 Shadowmere Swamp";
-                    else if (Math.abs(x - 5) < 10 && Math.abs(z - 5) < 10) region = "🏰 Mystical Tower Area";
-                    
-                    const regionElement = document.getElementById('playerRegion');
-                    if (regionElement) {
-                        regionElement.textContent = region;
-                    }
-                }
-                
-                updateLoadingProgress("Optimizing performance...");
-                updateLoadingProgress("Enhancing visual clarity...");
-
-                // Skip FXAA to preserve native sharpness; add optional sharpening when available
-                if (BABYLON.SharpenPostProcess) {
-                    const sharpenPostProcess = new BABYLON.SharpenPostProcess("sharpen", 1.0, camera);
-                    sharpenPostProcess.edgeAmount = 0.35;
-                    sharpenPostProcess.colorAmount = 0.2;
-                } else {
-                    console.info("Running without additional post-processing. Include the sharpen module if needed.");
-                }
-                
-                updateLoadingProgress("Starting game world...");
-                
-                // Start render loop
-                engine.runRenderLoop(function() {
-                    scene.render();
-                });
-                
-                // Handle window resize
-                window.addEventListener("resize", function() {
-                    applyHardwareScaling();
-                });
-                
-                // Show the game
-                setTimeout(() => {
-                    console.log("🎮 Enhanced Britannia Reborn with NPCs loaded successfully!");
-                    document.getElementById('loadingScreen').style.display = 'none';
-                    document.getElementById('gameCanvas').style.display = 'block';
-                    document.getElementById('gameCanvas').style.visibility = 'visible';
-                    document.getElementById('gameUI').style.display = 'block';
-
-                    applyHardwareScaling();
-                    canvas.tabIndex = 0;
-                    canvas.focus();
-                    
-                    updateStatus("Welcome to Britannia! Seek out the inhabitants and learn their stories...");
-                }, 1000);
-                
-            } catch (error) {
-                console.error("💥 Game initialization error:", error);
-                showError("Enhanced game initialization failed: " + error.message);
+                group.add(base);
+                group.add(roof);
+                group.add(chimney);
+                group.name = `${template.label || 'Structure'} (Fallback)`;
+                group.userData.fallback = true;
+                group.userData.sourceUrl = url;
+                return group;
             }
         }
-        
-        // Start the enhanced game
-        window.addEventListener('load', function() {
-            console.log("📱 Page loaded, initializing Enhanced Britannia Reborn with NPCs...");
-            setTimeout(loadBabylonJS, 100);
-        });
-        
-        // Handle page visibility for performance
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                console.log("🔇 Game paused (tab hidden)");
-            } else {
-                console.log("🔊 Game resumed (tab visible)");
+
+        class Region {
+            constructor(config) {
+                this.id = config.id;
+                this.name = config.name;
+                this.label = config.label || config.name;
+                this.color = new THREE.Color(config.color ?? 0x4c6b38);
+                this.center = new THREE.Vector3(
+                    config.center?.x ?? 0,
+                    config.center?.y ?? config.altitude ?? 0,
+                    config.center?.z ?? 0
+                );
+                this.size = new THREE.Vector3(
+                    config.size?.x ?? 120,
+                    config.size?.y ?? 0,
+                    config.size?.z ?? 120
+                );
+                this.altitude = config.altitude ?? this.center.y ?? 0;
+                this.buildingTemplates = Array.isArray(config.buildingTemplates) ? config.buildingTemplates : [];
+                this.buildingCountRange = config.buildingCountRange || [3, 5];
+                this.decorations = config.decorations;
+                this.bounds = new THREE.Box3().setFromCenterAndSize(
+                    new THREE.Vector3(this.center.x, this.altitude + 5, this.center.z),
+                    new THREE.Vector3(this.size.x, 30, this.size.z)
+                );
+                this.placedPositions = [];
+                this.buildingRoots = [];
             }
-        });
+
+            async populate(scene, loader) {
+                const regionGroup = new THREE.Group();
+                regionGroup.name = `${this.name}Region`;
+                scene.add(regionGroup);
+
+                this.createGround(regionGroup);
+                await this.addBuildings(regionGroup, loader);
+                this.addDecorations(regionGroup);
+
+                return this.buildingRoots;
+            }
+
+            createGround(parent) {
+                let geometry;
+                if (this.id === 'tower') {
+                    geometry = new THREE.CircleGeometry(Math.max(this.size.x, this.size.z) * 0.35, 48);
+                } else {
+                    geometry = new THREE.PlaneGeometry(this.size.x, this.size.z, 1, 1);
+                }
+                const material = new THREE.MeshStandardMaterial({
+                    color: this.color,
+                    roughness: this.id === 'desert' ? 0.95 : 0.8,
+                    metalness: 0.05
+                });
+                const ground = new THREE.Mesh(geometry, material);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.set(this.center.x, this.altitude - 0.02, this.center.z);
+                ground.receiveShadow = true;
+                ground.name = `${this.name}Ground`;
+                parent.add(ground);
+            }
+
+            async addBuildings(parent, loader) {
+                const [min, max] = this.buildingCountRange;
+                const count = Math.max(0, Math.floor(Math.random() * (max - min + 1)) + min);
+                const tasks = [];
+                for (let i = 0; i < count; i++) {
+                    const template = this.randomTemplate(i);
+                    if (!template) {
+                        continue;
+                    }
+                    const templateCopy = { ...template };
+                    if (this.id === 'tower' && i === 0) {
+                        templateCopy.anchorPosition = new THREE.Vector3(this.center.x, this.altitude, this.center.z);
+                        templateCopy.rotation = Math.random() * Math.PI * 2;
+                    }
+                    tasks.push(this.loadAndConfigureBuilding(loader, templateCopy));
+                }
+
+                const loaded = await Promise.all(tasks);
+                loaded.forEach((entry) => {
+                    if (!entry) {
+                        return;
+                    }
+                    const { object, template } = entry;
+                    const spacing = template.spacing ?? 18;
+                    const position = template.anchorPosition ? template.anchorPosition.clone() : this.samplePlacementPosition(spacing);
+                    object.position.copy(position);
+                    if (!template.anchorPosition) {
+                        object.rotation.y = template.rotation ?? this.randomRotation();
+                    } else if (template.rotation !== undefined) {
+                        object.rotation.y = template.rotation;
+                    }
+                    object.position.y = (object.position.y ?? this.altitude) + (template.yOffset ?? 0);
+
+                    if (template.scaleVector) {
+                        object.scale.copy(template.scaleVector);
+                    } else if (template.scale) {
+                        object.scale.setScalar(template.scale);
+                    }
+
+                    object.userData.isBuildingRoot = true;
+                    object.userData.label = template.label || 'Structure';
+                    object.userData.regionId = this.id;
+                    object.userData.assetFile = template.file || 'fallback';
+                    object.updateMatrixWorld(true);
+                    parent.add(object);
+                    this.buildingRoots.push(object);
+                });
+
+                return this.buildingRoots;
+            }
+
+            async loadAndConfigureBuilding(loader, template) {
+                try {
+                    const object = await loader.loadModel(template);
+                    return { object, template };
+                } catch (error) {
+                    console.error(`Unable to populate ${this.name} with ${template.file}`, error);
+                    return null;
+                }
+            }
+
+            addDecorations(parent) {
+                if (!this.decorations) {
+                    return;
+                }
+
+                switch (this.decorations.type) {
+                    case 'trees':
+                        this.addTreeInstances(parent, this.decorations.count ?? 60);
+                        break;
+                    case 'reeds':
+                        this.addReedInstances(parent, this.decorations.count ?? 50);
+                        break;
+                    case 'dunes':
+                        this.addDunes(parent, this.decorations.count ?? 30);
+                        break;
+                    case 'arcane':
+                        this.addArcaneCrystals(parent, this.decorations.count ?? 20);
+                        break;
+                    case 'fields':
+                        this.addFieldPatches(parent, this.decorations.rows ?? 2, this.decorations.columns ?? 3);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            addTreeInstances(parent, count) {
+                const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.6, 4.5, 6);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x3d2715, roughness: 0.85 });
+                const foliageGeometry = new THREE.ConeGeometry(2.5, 4.8, 8);
+                const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x1f5d32, roughness: 0.65 });
+
+                const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, count);
+                const foliage = new THREE.InstancedMesh(foliageGeometry, foliageMaterial, count);
+                const dummy = new THREE.Object3D();
+
+                for (let i = 0; i < count; i++) {
+                    const point = this.randomPoint(8);
+                    const sizeFactor = 0.8 + Math.random() * 0.6;
+
+                    dummy.position.set(point.x, this.altitude + 2.2, point.z);
+                    dummy.scale.set(sizeFactor, sizeFactor, sizeFactor);
+                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
+                    dummy.updateMatrix();
+                    trunks.setMatrixAt(i, dummy.matrix);
+
+                    dummy.position.set(point.x, this.altitude + 4.6 * sizeFactor, point.z);
+                    dummy.scale.set(sizeFactor, sizeFactor, sizeFactor);
+                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
+                    dummy.updateMatrix();
+                    foliage.setMatrixAt(i, dummy.matrix);
+                }
+
+                trunks.castShadow = false;
+                trunks.receiveShadow = true;
+                foliage.castShadow = true;
+                foliage.receiveShadow = true;
+                trunks.instanceMatrix.needsUpdate = true;
+                foliage.instanceMatrix.needsUpdate = true;
+
+                parent.add(trunks);
+                parent.add(foliage);
+            }
+
+            addReedInstances(parent, count) {
+                const stalkGeometry = new THREE.CylinderGeometry(0.15, 0.2, 2.6, 5);
+                const stalkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a6a3a, roughness: 0.75 });
+                const reeds = new THREE.InstancedMesh(stalkGeometry, stalkMaterial, count);
+                const dummy = new THREE.Object3D();
+
+                for (let i = 0; i < count; i++) {
+                    const point = this.randomPoint(4);
+                    const scale = 0.8 + Math.random() * 0.5;
+                    dummy.position.set(point.x, this.altitude + 1.3, point.z);
+                    dummy.scale.setScalar(scale);
+                    dummy.rotation.set(Math.random() * 0.3, Math.random() * Math.PI * 2, 0);
+                    dummy.updateMatrix();
+                    reeds.setMatrixAt(i, dummy.matrix);
+                }
+
+                reeds.castShadow = false;
+                reeds.receiveShadow = true;
+                reeds.instanceMatrix.needsUpdate = true;
+                parent.add(reeds);
+            }
+
+            addDunes(parent, count) {
+                const duneGeometry = new THREE.SphereGeometry(4, 12, 12);
+                const duneMaterial = new THREE.MeshStandardMaterial({ color: 0xdcb67a, roughness: 0.95, metalness: 0.02 });
+                for (let i = 0; i < count; i++) {
+                    const dune = new THREE.Mesh(duneGeometry, duneMaterial);
+                    const point = this.randomPoint(12);
+                    const scale = 0.8 + Math.random() * 1.4;
+                    dune.scale.set(1.8 * scale, 0.6 * scale, 1.4 * scale);
+                    dune.position.set(point.x, this.altitude + 1.2 * (scale - 0.6), point.z);
+                    dune.castShadow = false;
+                    dune.receiveShadow = true;
+                    dune.rotation.y = Math.random() * Math.PI;
+                    parent.add(dune);
+                }
+            }
+
+            addArcaneCrystals(parent, count) {
+                const crystalGeometry = new THREE.OctahedronGeometry(1.2, 0);
+                const crystalMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x8c9bff,
+                    emissive: 0x3a4aff,
+                    emissiveIntensity: 0.4,
+                    roughness: 0.35,
+                    metalness: 0.2
+                });
+
+                for (let i = 0; i < count; i++) {
+                    const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+                    const point = this.randomPoint(10);
+                    const scale = 0.6 + Math.random() * 0.9;
+                    crystal.scale.setScalar(scale);
+                    crystal.position.set(point.x, this.altitude + 0.8 + Math.sin(i) * 0.2, point.z);
+                    crystal.rotation.y = Math.random() * Math.PI * 2;
+                    crystal.rotation.x = Math.random() * 0.6;
+                    crystal.castShadow = true;
+                    crystal.receiveShadow = true;
+                    parent.add(crystal);
+                }
+            }
+
+            addFieldPatches(parent, rows, columns) {
+                const width = this.size.x * 0.65;
+                const depth = this.size.z * 0.65;
+                const spacingX = width / Math.max(1, columns);
+                const spacingZ = depth / Math.max(1, rows);
+
+                const patchGeometry = new THREE.PlaneGeometry(spacingX * 0.8, spacingZ * 0.8);
+                const patchMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xb69b5b,
+                    roughness: 0.9,
+                    metalness: 0.05
+                });
+
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < columns; col++) {
+                        const patch = new THREE.Mesh(patchGeometry, patchMaterial);
+                        const offsetX = (col - (columns - 1) / 2) * spacingX;
+                        const offsetZ = (row - (rows - 1) / 2) * spacingZ;
+                        patch.rotation.x = -Math.PI / 2;
+                        patch.position.set(this.center.x + offsetX, this.altitude - 0.01, this.center.z + offsetZ);
+                        patch.receiveShadow = true;
+                        parent.add(patch);
+                    }
+                }
+            }
+
+            randomTemplate(index) {
+                if (!this.buildingTemplates.length) {
+                    return null;
+                }
+                const template = this.buildingTemplates[index % this.buildingTemplates.length];
+                if (index < this.buildingTemplates.length) {
+                    return { ...template };
+                }
+                const randomIndex = Math.floor(Math.random() * this.buildingTemplates.length);
+                return { ...this.buildingTemplates[randomIndex] };
+            }
+
+            randomRotation() {
+                return Math.random() * Math.PI * 2;
+            }
+
+            samplePlacementPosition(minDistance) {
+                const attempts = 20;
+                const radiusX = Math.max(8, this.size.x / 2 - 6);
+                const radiusZ = Math.max(8, this.size.z / 2 - 6);
+
+                for (let i = 0; i < attempts; i++) {
+                    const candidate = new THREE.Vector3(
+                        this.center.x + (Math.random() * 2 - 1) * radiusX,
+                        this.altitude,
+                        this.center.z + (Math.random() * 2 - 1) * radiusZ
+                    );
+                    const tooClose = this.placedPositions.some((pos) => pos.distanceToSquared(candidate) < minDistance * minDistance);
+                    if (!tooClose) {
+                        this.placedPositions.push(candidate.clone());
+                        return candidate;
+                    }
+                }
+
+                const fallback = new THREE.Vector3(
+                    this.center.x + (Math.random() * 2 - 1) * radiusX,
+                    this.altitude,
+                    this.center.z + (Math.random() * 2 - 1) * radiusZ
+                );
+                this.placedPositions.push(fallback.clone());
+                return fallback;
+            }
+
+            randomPoint(edgePadding = 6) {
+                const radiusX = Math.max(4, this.size.x / 2 - edgePadding);
+                const radiusZ = Math.max(4, this.size.z / 2 - edgePadding);
+                return new THREE.Vector3(
+                    this.center.x + (Math.random() * 2 - 1) * radiusX,
+                    this.altitude,
+                    this.center.z + (Math.random() * 2 - 1) * radiusZ
+                );
+            }
+
+            contains(position) {
+                return this.bounds.containsPoint(position);
+            }
+        }
+
+        class RegionManager {
+            constructor(scene, loader, overlay) {
+                this.scene = scene;
+                this.loader = loader;
+                this.overlay = overlay;
+                this.regions = REGION_DEFINITIONS.map((config) => new Region(config));
+                this.interactables = [];
+            }
+
+            async buildWorld() {
+                const interactables = [];
+                for (const region of this.regions) {
+                    this.overlay.setStatus(`Populating ${region.name}...`);
+                    const buildings = await region.populate(this.scene, this.loader);
+                    interactables.push(...buildings);
+                }
+                this.interactables = interactables;
+                return interactables;
+            }
+
+            getRegionLabel(position) {
+                const region = this.regions.find((entry) => entry.contains(position));
+                return region ? region.label : 'Uncharted Wilds';
+            }
+        }
+
+        class PlayerController {
+            constructor(camera, canvas, scene) {
+                this.camera = camera;
+                this.canvas = canvas;
+                this.scene = scene;
+                this.controls = new PointerLockControls(camera, canvas);
+                this.scene.add(this.controls.getObject());
+                this.moveState = {
+                    forward: false,
+                    backward: false,
+                    left: false,
+                    right: false,
+                    sprint: false
+                };
+                this.speed = 18;
+                this.sprintMultiplier = 1.6;
+                this.listeners = {
+                    keydown: this.onKeyDown.bind(this),
+                    keyup: this.onKeyUp.bind(this)
+                };
+                document.addEventListener('keydown', this.listeners.keydown);
+                document.addEventListener('keyup', this.listeners.keyup);
+            }
+
+            setPosition(position) {
+                this.controls.getObject().position.copy(position);
+            }
+
+            setInteractionHandler(handler) {
+                this.interactionHandler = handler;
+            }
+
+            setLockCallbacks(onLock, onUnlock) {
+                if (onLock) {
+                    this.controls.addEventListener('lock', onLock);
+                }
+                if (onUnlock) {
+                    this.controls.addEventListener('unlock', onUnlock);
+                }
+            }
+
+            lock() {
+                this.controls.lock();
+            }
+
+            unlock() {
+                this.controls.unlock();
+            }
+
+            dispose() {
+                document.removeEventListener('keydown', this.listeners.keydown);
+                document.removeEventListener('keyup', this.listeners.keyup);
+            }
+
+            isLocked() {
+                return this.controls.isLocked;
+            }
+
+            onKeyDown(event) {
+                switch (event.code) {
+                    case 'KeyW':
+                    case 'ArrowUp':
+                        this.moveState.forward = true;
+                        break;
+                    case 'KeyS':
+                    case 'ArrowDown':
+                        this.moveState.backward = true;
+                        break;
+                    case 'KeyA':
+                    case 'ArrowLeft':
+                        this.moveState.left = true;
+                        break;
+                    case 'KeyD':
+                    case 'ArrowRight':
+                        this.moveState.right = true;
+                        break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight':
+                        this.moveState.sprint = true;
+                        break;
+                    case 'KeyE':
+                        if (!event.repeat && typeof this.interactionHandler === 'function') {
+                            this.interactionHandler();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            onKeyUp(event) {
+                switch (event.code) {
+                    case 'KeyW':
+                    case 'ArrowUp':
+                        this.moveState.forward = false;
+                        break;
+                    case 'KeyS':
+                    case 'ArrowDown':
+                        this.moveState.backward = false;
+                        break;
+                    case 'KeyA':
+                    case 'ArrowLeft':
+                        this.moveState.left = false;
+                        break;
+                    case 'KeyD':
+                    case 'ArrowRight':
+                        this.moveState.right = false;
+                        break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight':
+                        this.moveState.sprint = false;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            update(delta) {
+                const object = this.controls.getObject();
+                if (this.controls.isLocked) {
+                    const forward = (this.moveState.forward ? 1 : 0) - (this.moveState.backward ? 1 : 0);
+                    const strafe = (this.moveState.right ? 1 : 0) - (this.moveState.left ? 1 : 0);
+                    if (forward !== 0 || strafe !== 0) {
+                        const direction = new THREE.Vector3(strafe, 0, forward).normalize();
+                        const speed = this.speed * (this.moveState.sprint ? this.sprintMultiplier : 1);
+                        this.controls.moveRight(direction.x * speed * delta);
+                        this.controls.moveForward(direction.z * speed * delta);
+                    }
+                }
+
+                object.position.y = 2;
+                object.position.x = THREE.MathUtils.clamp(object.position.x, -220, 220);
+                object.position.z = THREE.MathUtils.clamp(object.position.z, -220, 220);
+                return object.position;
+            }
+        }
+
+        class BritanniaGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.hudPosition = document.getElementById('hudPosition');
+                this.hudRegion = document.getElementById('hudRegion');
+                this.hudStatus = document.getElementById('hudStatus');
+                this.interactionPrompt = document.getElementById('interactionPrompt');
+                this.errorOverlay = document.getElementById('errorOverlay');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.retryButton = document.getElementById('retryButton');
+                this.loadingOverlay = new LoadingOverlay();
+                this.clock = new THREE.Clock();
+                this.raycaster = new THREE.Raycaster();
+                this.focusedBuilding = null;
+                this.interactableObjects = [];
+                this.statusTimeout = null;
+                this.isPaused = false;
+                this.tempPosition = new THREE.Vector3();
+                this.tempDirection = new THREE.Vector3();
+
+                if (this.retryButton) {
+                    this.retryButton.addEventListener('click', () => window.location.reload());
+                }
+            }
+
+            async init() {
+                try {
+                    this.loadingOverlay.show();
+                    this.loadingOverlay.setStatus('Initializing renderer...');
+                    this.setupRenderer();
+                    this.setupScene();
+                    this.setupLights();
+
+                    this.assetLoader = new AssetLoader(this.loadingOverlay);
+                    this.regionManager = new RegionManager(this.scene, this.assetLoader, this.loadingOverlay);
+
+                    this.loadingOverlay.setStatus('Shaping Britannia regions...');
+                    this.interactableObjects = await this.regionManager.buildWorld();
+
+                    this.setupPlayer();
+                    this.setupEvents();
+
+                    this.loadingOverlay.setStatus('Britannia is ready. Click to enter.');
+                    this.loadingOverlay.setProgress(100);
+                    window.setTimeout(() => this.loadingOverlay.hide(), 600);
+
+                    this.animate();
+                } catch (error) {
+                    console.error('Game initialization failed:', error);
+                    this.showError(`Initialization failed: ${error.message}`);
+                }
+            }
+
+            setupRenderer() {
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: this.canvas,
+                    antialias: true,
+                    powerPreference: 'high-performance'
+                });
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+                this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.08;
+                this.renderer.useLegacyLights = false;
+            }
+
+            setupScene() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x0b1d2d);
+                this.scene.fog = new THREE.FogExp2(0x0b1d2d, 0.0022);
+
+                const baseGround = new THREE.Mesh(
+                    new THREE.PlaneGeometry(520, 520),
+                    new THREE.MeshStandardMaterial({ color: 0x1e2732, roughness: 1, metalness: 0 })
+                );
+                baseGround.rotation.x = -Math.PI / 2;
+                baseGround.position.y = -0.6;
+                baseGround.receiveShadow = true;
+                this.scene.add(baseGround);
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 6, 20);
+            }
+
+            setupLights() {
+                const hemiLight = new THREE.HemisphereLight(0xe3f6ff, 0x24160b, 0.55);
+                this.scene.add(hemiLight);
+
+                const sunLight = new THREE.DirectionalLight(0xfff4d3, 1.25);
+                sunLight.position.set(-60, 90, 40);
+                sunLight.castShadow = true;
+                sunLight.shadow.mapSize.set(2048, 2048);
+                sunLight.shadow.camera.left = -220;
+                sunLight.shadow.camera.right = 220;
+                sunLight.shadow.camera.top = 220;
+                sunLight.shadow.camera.bottom = -220;
+                sunLight.shadow.camera.near = 20;
+                sunLight.shadow.camera.far = 320;
+                this.scene.add(sunLight);
+
+                const towerGlow = new THREE.PointLight(0x8898ff, 1.6, 120);
+                towerGlow.position.set(0, 30, 60);
+                this.scene.add(towerGlow);
+            }
+
+            setupPlayer() {
+                this.playerController = new PlayerController(this.camera, this.renderer.domElement, this.scene);
+                this.playerController.setPosition(new THREE.Vector3(0, 2, 60));
+                this.playerController.setInteractionHandler(() => this.handleInteraction());
+                this.playerController.setLockCallbacks(
+                    () => this.updateStatus('Exploring Britannia...'),
+                    () => this.updateStatus('Click the realm to continue exploring.')
+                );
+
+                this.renderer.domElement.addEventListener('click', () => {
+                    if (!this.playerController.isLocked()) {
+                        this.playerController.lock();
+                    }
+                }, { passive: true });
+            }
+
+            setupEvents() {
+                window.addEventListener('resize', () => this.onResize());
+                document.addEventListener('visibilitychange', () => this.onVisibilityChange());
+            }
+
+            onResize() {
+                if (!this.renderer || !this.camera) {
+                    return;
+                }
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+                this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+            }
+
+            onVisibilityChange() {
+                this.isPaused = document.hidden;
+                if (!this.isPaused) {
+                    this.clock.getDelta();
+                }
+            }
+
+            animate() {
+                this.renderer.setAnimationLoop(() => {
+                    const delta = this.clock.getDelta();
+                    if (!this.isPaused) {
+                        const position = this.playerController.update(delta);
+                        this.updateHUD(position);
+                        this.updateInteraction();
+                    }
+                    this.renderer.render(this.scene, this.camera);
+                });
+            }
+
+            updateHUD(position) {
+                if (!position) {
+                    return;
+                }
+                if (this.hudPosition) {
+                    this.hudPosition.textContent = `${position.x.toFixed(1)}, ${position.z.toFixed(1)}`;
+                }
+                if (this.hudRegion) {
+                    const regionLabel = this.regionManager.getRegionLabel(position);
+                    this.hudRegion.textContent = regionLabel;
+                }
+            }
+
+            updateInteraction() {
+                if (!this.playerController || !this.playerController.isLocked()) {
+                    this.hideInteractionPrompt();
+                    return;
+                }
+
+                if (!this.interactableObjects || this.interactableObjects.length === 0) {
+                    this.hideInteractionPrompt();
+                    return;
+                }
+
+                const origin = this.camera.getWorldPosition(this.tempPosition);
+                const direction = this.tempDirection.set(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
+                this.raycaster.set(origin, direction);
+                this.raycaster.far = 18;
+
+                const intersections = this.raycaster.intersectObjects(this.interactableObjects, true);
+                if (intersections.length === 0) {
+                    this.hideInteractionPrompt();
+                    return;
+                }
+
+                const { object, distance } = intersections[0];
+                if (distance > 14) {
+                    this.hideInteractionPrompt();
+                    return;
+                }
+
+                const buildingRoot = this.findBuildingRoot(object);
+                if (!buildingRoot) {
+                    this.hideInteractionPrompt();
+                    return;
+                }
+
+                this.focusedBuilding = buildingRoot;
+                if (this.interactionPrompt) {
+                    this.interactionPrompt.style.display = 'block';
+                    const label = buildingRoot.userData.label || 'structure';
+                    this.interactionPrompt.innerHTML = `Press <span>E</span> to inspect ${label}`;
+                }
+            }
+
+            hideInteractionPrompt() {
+                this.focusedBuilding = null;
+                if (this.interactionPrompt) {
+                    this.interactionPrompt.style.display = 'none';
+                }
+            }
+
+            findBuildingRoot(object) {
+                let current = object;
+                while (current && !current.userData?.isBuildingRoot) {
+                    current = current.parent;
+                }
+                return current && current.userData?.isBuildingRoot ? current : null;
+            }
+
+            handleInteraction() {
+                if (!this.focusedBuilding) {
+                    this.updateStatus('Nothing of interest nearby.');
+                    return;
+                }
+                const label = this.focusedBuilding.userData.label || 'Structure';
+                const asset = this.focusedBuilding.userData.assetFile || 'mystery';
+                const statusMessage = `Inspecting ${label} (${asset})`;
+                this.updateStatus(statusMessage);
+            }
+
+            updateStatus(message) {
+                if (!this.hudStatus) {
+                    return;
+                }
+                this.hudStatus.textContent = message;
+                if (this.statusTimeout) {
+                    window.clearTimeout(this.statusTimeout);
+                }
+                this.statusTimeout = window.setTimeout(() => {
+                    if (this.hudStatus) {
+                        this.hudStatus.textContent = 'Exploring Britannia...';
+                    }
+                }, 4500);
+            }
+
+            showError(message) {
+                if (this.loadingOverlay) {
+                    this.loadingOverlay.hide();
+                }
+                if (this.errorMessage) {
+                    this.errorMessage.textContent = message;
+                }
+                if (this.errorOverlay) {
+                    this.errorOverlay.style.display = 'flex';
+                }
+            }
+        }
+
+        const launchGame = () => {
+            const game = new BritanniaGame();
+            game.init();
+            window.britanniaGame = game;
+        };
+
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', launchGame);
+        } else {
+            launchGame();
+        }
     </script>
 </body>
 </html>
