@@ -229,11 +229,34 @@
     <div id="interactionPrompt">Press <span>E</span> to inspect</div>
 
     <script type="module">
-        import * as THREE from "https://unpkg.com/three@0.160.1/build/three.module.js?module";
-        import { GLTFLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js?module";
-        import { DRACOLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/DRACOLoader.js?module";
-        import { PointerLockControls } from "https://unpkg.com/three@0.160.1/examples/jsm/controls/PointerLockControls.js?module";
-        import * as SkeletonUtils from "https://unpkg.com/three@0.160.1/examples/jsm/utils/SkeletonUtils.js?module";
+        import * as THREE from "https://unpkg.com/three@0.160.1/build/three.module.js";
+        import { GLTFLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js";
+        import { DRACOLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/DRACOLoader.js";
+        import { PointerLockControls } from "https://unpkg.com/three@0.160.1/examples/jsm/controls/PointerLockControls.js";
+        import { SkeletonUtils } from "https://unpkg.com/three@0.160.1/examples/jsm/utils/SkeletonUtils.js";
+
+        const THREE_VERSION = "0.160.1";
+        const THREE_BASE_URL = `https://unpkg.com/three@${THREE_VERSION}`;
+
+        const ensureFileLoaderOptions = () => {
+            const { FileLoader } = THREE;
+            if (!FileLoader || FileLoader.__britanniaPatched) {
+                return;
+            }
+
+            const originalLoad = FileLoader.prototype.load;
+            FileLoader.prototype.load = function (url, onLoad, onProgress, onError, options) {
+                // The default implementation introduced an AbortSignal expectation.
+                // When no options are supplied, provide an empty object so the loader
+                // can safely destructure properties without throwing.
+                const normalizedOptions = (options && typeof options === "object") ? options : {};
+                return originalLoad.call(this, url, onLoad, onProgress, onError, normalizedOptions);
+            };
+
+            FileLoader.__britanniaPatched = true;
+        };
+
+        ensureFileLoaderOptions();
 
         THREE.Cache.enabled = true;
 
@@ -448,7 +471,7 @@
                 };
                 this.gltfLoader = new GLTFLoader(this.manager);
                 const dracoLoader = new DRACOLoader(this.manager);
-                dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.1/examples/jsm/libs/draco/');
+                dracoLoader.setDecoderPath(`${THREE_BASE_URL}/examples/jsm/libs/draco/`);
                 this.gltfLoader.setDRACOLoader(dracoLoader);
                 this.cache = new Map();
             }
