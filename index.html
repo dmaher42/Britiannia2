@@ -229,7 +229,7 @@
     <div id="interactionPrompt">Press <span>E</span> to inspect</div>
 
     <script type="module">
-        import * as THREE from "https://unpkg.com/three@0.160.1/build/three.module.js";
+        import * as THREE from "https://unpkg.com/three@0.160.1/build/three.module.js?module";
         import { GLTFLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js?module";
         import { DRACOLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/DRACOLoader.js?module";
         import { PointerLockControls } from "https://unpkg.com/three@0.160.1/examples/jsm/controls/PointerLockControls.js?module";
@@ -1125,7 +1125,6 @@
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 this.renderer.toneMappingExposure = 1.08;
-                this.renderer.useLegacyLights = false;
             }
 
             setupScene() {
