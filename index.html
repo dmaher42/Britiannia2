@@ -238,6 +238,107 @@
         const THREE_VERSION = "0.160.1";
         const THREE_BASE_URL = `https://unpkg.com/three@${THREE_VERSION}`;
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const BUILD_VERSION = urlParams.get('v') || `${Date.now()}`;
+        const VERSION_PARAM = `v=${encodeURIComponent(BUILD_VERSION)}`;
+        const DEBUG_ENABLED = urlParams.get('debug') !== '0';
+        const SERVICE_WORKER_QUERY = urlParams.get('sw');
+        const LOG_PREFIX = '[Britannia]';
+
+        const appendVersionParam = (url) => {
+            if (!url || typeof url !== 'string') {
+                return url;
+            }
+            if (url.startsWith('data:') || url.startsWith('blob:')) {
+                return url;
+            }
+            if (url.includes('v=')) {
+                return url;
+            }
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}${VERSION_PARAM}`;
+        };
+
+        const devBadgeState = {
+            assetsCompleted: 0,
+            assetsTotal: 0,
+            failures: 0,
+            sw: (("serviceWorker" in navigator) && navigator.serviceWorker.controller) ? 'on' : 'off',
+            swUrl: (("serviceWorker" in navigator) && navigator.serviceWorker.controller) ? navigator.serviceWorker.controller.scriptURL : ''
+        };
+
+        let devBadgeElement = null;
+
+        const ensureDevBadge = () => {
+            if (!DEBUG_ENABLED) {
+                return null;
+            }
+            if (devBadgeElement) {
+                return devBadgeElement;
+            }
+            const badge = document.createElement('div');
+            badge.id = 'britanniaDevBadge';
+            badge.style.position = 'fixed';
+            badge.style.top = '6px';
+            badge.style.left = '6px';
+            badge.style.padding = '4px 8px';
+            badge.style.background = 'rgba(0, 0, 0, 0.45)';
+            badge.style.color = '#f0e6d6';
+            badge.style.fontSize = '11px';
+            badge.style.fontFamily = 'monospace';
+            badge.style.borderRadius = '6px';
+            badge.style.opacity = '0.7';
+            badge.style.pointerEvents = 'none';
+            badge.style.zIndex = '50';
+            badge.style.letterSpacing = '0.02em';
+            document.body.appendChild(badge);
+            devBadgeElement = badge;
+            return devBadgeElement;
+        };
+
+        const refreshDevBadge = () => {
+            const badge = ensureDevBadge();
+            if (!badge) {
+                return;
+            }
+            const { assetsCompleted, assetsTotal, failures, sw, swUrl } = devBadgeState;
+            const totalText = assetsTotal ? `${assetsCompleted}/${assetsTotal}` : `${assetsCompleted}`;
+            const failureText = failures ? ` (${failures} fail${failures === 1 ? '' : 's'})` : '';
+            badge.textContent = `assets ${totalText}${failureText} • SW:${sw} • v:${BUILD_VERSION}`;
+            badge.title = swUrl ? `Service Worker: ${swUrl}` : 'Service Worker inactive';
+        };
+
+        const updateServiceWorkerBadgeState = (controller) => {
+            devBadgeState.sw = controller ? 'on' : 'off';
+            devBadgeState.swUrl = controller?.scriptURL || '';
+            refreshDevBadge();
+        };
+
+        const clearBritanniaCachesAndReload = async () => {
+            try {
+                if ('caches' in window && typeof caches.keys === 'function') {
+                    const keys = await caches.keys();
+                    const matching = keys.filter((key) => key.toLowerCase().includes('britannia'));
+                    await Promise.all(matching.map((key) => caches.delete(key)));
+                }
+            } catch (error) {
+                console.warn(`${LOG_PREFIX} Failed to clear caches before retry`, error);
+            }
+            const nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set('v', `${Date.now()}`);
+            window.location.href = nextUrl.toString();
+        };
+
+        updateServiceWorkerBadgeState(("serviceWorker" in navigator) ? navigator.serviceWorker.controller : null);
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                const controller = navigator.serviceWorker.controller;
+                console.info(`${LOG_PREFIX} controllerchange`, controller?.scriptURL || 'none');
+                updateServiceWorkerBadgeState(controller);
+            });
+        }
+
         const ensureFileLoaderOptions = () => {
             const { FileLoader } = THREE;
             if (!FileLoader || FileLoader.__britanniaPatched) {
@@ -246,11 +347,32 @@
 
             const originalLoad = FileLoader.prototype.load;
             FileLoader.prototype.load = function (url, onLoad, onProgress, onError, options) {
-                // The default implementation introduced an AbortSignal expectation.
-                // When no options are supplied, provide an empty object so the loader
-                // can safely destructure properties without throwing.
-                const normalizedOptions = (options && typeof options === "object") ? options : {};
-                return originalLoad.call(this, url, onLoad, onProgress, onError, normalizedOptions);
+                const normalizedOptions = (options && typeof options === 'object') ? options : {};
+                const targetUrl = url;
+                console.info(`${LOG_PREFIX} load:start`, targetUrl);
+
+                const wrappedOnLoad = (result) => {
+                    console.info(`${LOG_PREFIX} load:success`, targetUrl);
+                    if (typeof onLoad === 'function') {
+                        try {
+                            onLoad(result);
+                        } catch (callbackError) {
+                            console.error(`${LOG_PREFIX} load:onLoad callback error`, callbackError);
+                            throw callbackError;
+                        }
+                    }
+                };
+
+                const wrappedOnError = (error) => {
+                    console.warn(`${LOG_PREFIX} load:failure`, targetUrl, error);
+                    if (typeof onError === 'function') {
+                        onError(error);
+                        return;
+                    }
+                    throw error instanceof Error ? error : new Error(error?.message || 'FileLoader load failed');
+                };
+
+                return originalLoad.call(this, targetUrl, wrappedOnLoad, onProgress, wrappedOnError, normalizedOptions);
             };
 
             FileLoader.__britanniaPatched = true;
@@ -263,8 +385,73 @@
         const MODEL_BASE_URL = "https://dmaher42.github.io/Britiannia2/assets/models/web/";
         const SERVICE_WORKER_PATH = "britannia-service-worker.js";
 
+        console.info(`${LOG_PREFIX} THREE r${THREE.REVISION} (module ${THREE_VERSION})`);
+        console.info(`${LOG_PREFIX} MODEL_BASE_URL`, MODEL_BASE_URL);
+        console.info(`${LOG_PREFIX} Build version`, BUILD_VERSION);
+        if ('serviceWorker' in navigator) {
+            console.info(`${LOG_PREFIX} SW controller`, navigator.serviceWorker.controller?.scriptURL || 'none');
+        } else {
+            console.info(`${LOG_PREFIX} Service workers unsupported in this browser`);
+        }
+
+        const waitForControllerActivation = () => new Promise((resolve) => {
+            if (!('serviceWorker' in navigator)) {
+                resolve();
+                return;
+            }
+
+            const controller = navigator.serviceWorker.controller;
+            if (!controller) {
+                resolve();
+                return;
+            }
+
+            if (controller.state === 'activated') {
+                resolve();
+                return;
+            }
+
+            let resolved = false;
+            const finish = () => {
+                if (resolved) {
+                    return;
+                }
+                resolved = true;
+                if (typeof controller.removeEventListener === 'function') {
+                    controller.removeEventListener('statechange', handleStateChange);
+                }
+                resolve();
+            };
+
+            const handleStateChange = () => {
+                if (controller.state === 'activated' || controller.state === 'redundant') {
+                    finish();
+                }
+            };
+
+            if (typeof controller.addEventListener === 'function') {
+                controller.addEventListener('statechange', handleStateChange);
+            }
+
+            setTimeout(finish, 4000);
+        });
+
         const setupServiceWorker = async () => {
-            if (!("serviceWorker" in navigator)) {
+            if (!('serviceWorker' in navigator)) {
+                return;
+            }
+
+            if (SERVICE_WORKER_QUERY === 'off') {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(
+                        registrations.map((registration) => registration.unregister().catch(() => false))
+                    );
+                    console.info(`${LOG_PREFIX} Service worker disabled via ?sw=off`);
+                } catch (error) {
+                    console.warn(`${LOG_PREFIX} Failed to disable service worker`, error);
+                }
+                updateServiceWorkerBadgeState(null);
                 return;
             }
 
@@ -274,8 +461,8 @@
                 try {
                     return new URL(scriptURL).pathname;
                 } catch (error) {
-                    console.warn("Unable to parse service worker script URL:", scriptURL, error);
-                    return "";
+                    console.warn(`${LOG_PREFIX} Unable to parse service worker script URL`, scriptURL, error);
+                    return '';
                 }
             };
             const isCurrentScript = (scriptURL) => getPathname(scriptURL).endsWith(`/${SERVICE_WORKER_PATH}`);
@@ -300,15 +487,41 @@
                     return scriptURLs.every((url) => !isCurrentScript(url));
                 });
 
+                if (legacyRegistrations.length) {
+                    console.info(`${LOG_PREFIX} Cleaning ${legacyRegistrations.length} legacy service worker(s)`);
+                }
+
                 await Promise.all(
                     legacyRegistrations.map((registration) =>
                         registration.unregister().catch(() => false)
                     )
                 );
 
-                await navigator.serviceWorker.register(SERVICE_WORKER_PATH, { scope: "./" });
+                const registration = await navigator.serviceWorker.register(SERVICE_WORKER_PATH, { scope: './' });
+                console.info(`${LOG_PREFIX} Service worker registered`, registration.scope);
+
+                if (SERVICE_WORKER_QUERY === 'refresh' && navigator.serviceWorker.controller) {
+                    console.info(`${LOG_PREFIX} Service worker refresh requested`);
+                    try {
+                        await registration.update();
+                        await waitForControllerActivation();
+                    } catch (refreshError) {
+                        console.warn(`${LOG_PREFIX} Service worker refresh failed`, refreshError);
+                    }
+                }
+
+                navigator.serviceWorker.ready
+                    .then((readyRegistration) => {
+                        const activeWorker = navigator.serviceWorker.controller || readyRegistration.active || readyRegistration.waiting;
+                        const scriptURL = activeWorker?.scriptURL || registration.active?.scriptURL || registration.installing?.scriptURL || 'none';
+                        console.info(`${LOG_PREFIX} Service worker ready`, scriptURL);
+                        updateServiceWorkerBadgeState(activeWorker || navigator.serviceWorker.controller || null);
+                    })
+                    .catch((readyError) => {
+                        console.warn(`${LOG_PREFIX} Service worker ready promise rejected`, readyError);
+                    });
             } catch (error) {
-                console.warn("Service worker setup failed:", error);
+                console.warn(`${LOG_PREFIX} Service worker setup failed`, error);
             }
         };
 
@@ -403,6 +616,9 @@
                 this.statusElement = document.getElementById('loadingText');
                 this.progressBar = document.getElementById('progressBar');
                 this.tipElement = document.getElementById('loadingTip');
+                this.errorOverlay = document.getElementById('errorOverlay');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.retryButton = document.getElementById('retryButton');
                 this.warningTimeout = null;
             }
 
@@ -431,6 +647,23 @@
                 }
             }
 
+            showFatal(message) {
+                this.hide();
+                if (this.errorMessage) {
+                    this.errorMessage.textContent = message;
+                }
+                if (this.errorOverlay) {
+                    this.errorOverlay.style.display = 'flex';
+                }
+                if (this.retryButton && typeof this.retryButton.focus === 'function') {
+                    try {
+                        this.retryButton.focus();
+                    } catch (error) {
+                        // Focusing may fail on some browsers; ignore silently.
+                    }
+                }
+            }
+
             reportWarning(message) {
                 if (!this.statusElement) {
                     return;
@@ -448,27 +681,76 @@
             }
         }
 
+        const GLOBAL_LOADING_OVERLAY = new LoadingOverlay();
+        window.__britanniaLoadingOverlay = GLOBAL_LOADING_OVERLAY;
+
+        let fatalErrorDisplayed = false;
+        const reportFatalError = (summary, error) => {
+            console.error(`${LOG_PREFIX} ${summary}`, error);
+            if (!fatalErrorDisplayed) {
+                fatalErrorDisplayed = true;
+                GLOBAL_LOADING_OVERLAY.showFatal('Britannia encountered an unexpected error. Check the console for details.');
+            }
+        };
+
+        window.addEventListener('error', (event) => {
+            reportFatalError('Runtime error', event?.error || event?.message || event);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            reportFatalError('Unhandled promise rejection', event?.reason);
+        });
+
         class AssetLoader {
             constructor(loadingOverlay) {
-                this.loadingOverlay = loadingOverlay;
+                this.loadingOverlay = loadingOverlay || GLOBAL_LOADING_OVERLAY;
                 this.manager = new THREE.LoadingManager();
-                this.manager.onStart = () => {
+                this.manager.setURLModifier((url) => appendVersionParam(url));
+                this.totalAssets = 0;
+                this.completedAssets = 0;
+                this.allDoneEmitted = false;
+                this.failureMap = new Map();
+                this.suppressedFailures = new Set();
+
+                const originalItemStart = this.manager.itemStart.bind(this.manager);
+                this.manager.itemStart = (url) => {
+                    this.allDoneEmitted = false;
+                    originalItemStart(url);
+                };
+
+                this.manager.onStart = (url, loaded, total) => {
+                    this.updateCounts(loaded ?? 0, total ?? 0);
                     this.loadingOverlay.setStatus('Summoning realm assets...');
-                    this.loadingOverlay.setProgress(3);
+                    const initialPercent = total ? (loaded / Math.max(total, 1)) * 100 : 3;
+                    this.loadingOverlay.setProgress(initialPercent);
                 };
+
                 this.manager.onProgress = (url, loaded, total) => {
-                    const percent = total ? (loaded / total) * 100 : Math.min(99, loaded * 10);
-                    this.loadingOverlay.setProgress(percent);
-                    this.loadingOverlay.setStatus(`Loading models ${loaded}/${total || '?'}...`);
+                    this.updateCounts(loaded ?? 0, total ?? 0);
+                    const percent = total ? (loaded / Math.max(total, 1)) * 100 : Math.min(99, (loaded ?? 0) * 10);
+                    this.loadingOverlay.setProgress(Math.min(percent, 100));
+                    const safeLoaded = Number.isFinite(loaded) ? loaded : '?';
+                    const safeTotal = Number.isFinite(total) ? total : '?';
+                    this.loadingOverlay.setStatus(`Loading assets ${safeLoaded}/${safeTotal}...`);
+                    this.maybeEmitAllDone();
                 };
+
                 this.manager.onLoad = () => {
+                    this.updateCounts(this.totalAssets, this.totalAssets);
                     this.loadingOverlay.setStatus('Finalizing structures...');
                     this.loadingOverlay.setProgress(100);
+                    this.maybeEmitAllDone();
                 };
+
                 this.manager.onError = (url) => {
-                    console.warn('Unable to load asset:', url);
-                    this.loadingOverlay.reportWarning(`Asset missing: ${this.trimBase(url)}`);
+                    const trimmed = this.trimBase(url);
+                    if (this.suppressedFailures.has(trimmed)) {
+                        return;
+                    }
+                    this.recordFailure(url, { reason: 'Loader error' });
+                    this.loadingOverlay.reportWarning(`Asset missing: ${trimmed}`);
                 };
+
                 this.gltfLoader = new GLTFLoader(this.manager);
                 const dracoLoader = new DRACOLoader(this.manager);
                 dracoLoader.setDecoderPath(`${THREE_BASE_URL}/examples/jsm/libs/draco/`);
@@ -476,18 +758,99 @@
                 this.cache = new Map();
             }
 
+            updateCounts(loaded, total) {
+                if (Number.isFinite(total) && total >= 0) {
+                    this.totalAssets = total;
+                }
+                if (Number.isFinite(loaded) && loaded >= 0) {
+                    this.completedAssets = loaded;
+                }
+                devBadgeState.assetsTotal = this.totalAssets;
+                devBadgeState.assetsCompleted = this.completedAssets;
+                devBadgeState.failures = this.failureMap.size;
+                refreshDevBadge();
+            }
+
+            maybeEmitAllDone() {
+                if (this.allDoneEmitted) {
+                    return;
+                }
+                if (this.totalAssets <= 0) {
+                    return;
+                }
+                if (this.completedAssets < this.totalAssets) {
+                    return;
+                }
+                this.allDoneEmitted = true;
+                const failures = Array.from(this.failureMap.values());
+                const detail = {
+                    total: this.totalAssets,
+                    completed: this.completedAssets,
+                    failures
+                };
+                this.loadingOverlay.setProgress(100);
+                this.loadingOverlay.setStatus('Finalizing structures...');
+                this.manager.dispatchEvent({ type: 'allDone', detail });
+                window.dispatchEvent(new CustomEvent('britannia:assets-all-done', { detail }));
+                if (failures.length) {
+                    console.groupCollapsed(`${LOG_PREFIX} Asset load failures (${failures.length})`);
+                    console.table(failures.map((entry) => ({
+                        url: entry.url,
+                        reason: entry.reason,
+                        status: entry.status ?? '',
+                        code: entry.code ?? ''
+                    })));
+                    console.groupEnd();
+                }
+                refreshDevBadge();
+            }
+
+            recordFailure(url, details = {}) {
+                const trimmed = this.trimBase(url);
+                if (this.suppressedFailures.has(trimmed)) {
+                    return null;
+                }
+                const existing = this.failureMap.get(trimmed) || {};
+                const entry = {
+                    url: trimmed,
+                    reason: details.reason || existing.reason || 'Unknown error',
+                    status: details.status ?? existing.status ?? null,
+                    code: details.code ?? existing.code ?? null
+                };
+                this.failureMap.set(trimmed, entry);
+                devBadgeState.failures = this.failureMap.size;
+                refreshDevBadge();
+                return entry;
+            }
+
+            describeLoaderError(error) {
+                if (!error) {
+                    return { message: 'Unknown loader error', status: null, code: null };
+                }
+                const status = error.status ?? error?.target?.status ?? error?.currentTarget?.status ?? null;
+                const statusText = error.statusText ?? error?.target?.statusText ?? error?.currentTarget?.statusText ?? '';
+                const code = error.code ?? error?.target?.status ?? null;
+                const message = error.message || statusText || 'Unknown loader error';
+                return { message, status, code };
+            }
+
             trimBase(url) {
                 if (!url) {
                     return '';
                 }
-                return url.startsWith(MODEL_BASE_URL) ? url.slice(MODEL_BASE_URL.length) : url;
+                const baseTrimmed = url.startsWith(MODEL_BASE_URL) ? url.slice(MODEL_BASE_URL.length) : url;
+                return baseTrimmed.split('?')[0];
             }
 
             resolveUrl(relativePath) {
                 if (!relativePath) {
                     return MODEL_BASE_URL;
                 }
-                return relativePath.startsWith('http') ? relativePath : `${MODEL_BASE_URL}${relativePath}`;
+                if (relativePath.startsWith('http')) {
+                    return relativePath;
+                }
+                const normalized = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+                return `${MODEL_BASE_URL}${normalized}`;
             }
 
             async loadModel(template = {}) {
@@ -502,20 +865,71 @@
                 }
 
                 const url = this.resolveUrl(relativePath);
+                const trimmed = this.trimBase(url);
+                const suppressWarning = Boolean(template.__selfTest);
+                if (suppressWarning) {
+                    this.suppressedFailures.add(trimmed);
+                }
+
                 try {
                     const gltf = await this.loadGLTF(url);
                     this.cache.set(cacheKey, gltf.scene);
                     return this.cloneScene(gltf.scene, template);
                 } catch (error) {
-                    console.warn(`Falling back to primitive for ${relativePath}`, error);
-                    this.loadingOverlay.reportWarning(`Using placeholder for ${template.label || this.trimBase(relativePath)}`);
+                    const reason = error?.message || `Failed to load ${trimmed}`;
+                    this.recordFailure(url, {
+                        reason,
+                        status: error?.status ?? null,
+                        code: error?.code ?? null
+                    });
+                    if (!suppressWarning) {
+                        const label = template.label || trimmed;
+                        this.loadingOverlay.reportWarning(`Using placeholder for ${label}`);
+                    }
+                    console.warn(`${LOG_PREFIX} Falling back to primitive for ${trimmed}`, error);
                     return this.createFallback(template, url);
+                } finally {
+                    if (suppressWarning) {
+                        this.suppressedFailures.delete(trimmed);
+                    }
                 }
             }
 
             loadGLTF(url) {
+                const timeoutMs = 15000;
+                const trimmed = this.trimBase(url);
                 return new Promise((resolve, reject) => {
-                    this.gltfLoader.load(url, resolve, undefined, (err) => reject(err));
+                    const start = performance.now();
+                    const timer = window.setTimeout(() => {
+                        window.clearTimeout(timer);
+                        const message = `Timed out loading ${trimmed} after ${timeoutMs / 1000}s`;
+                        const timeoutError = new Error(message);
+                        timeoutError.code = 'timeout';
+                        timeoutError.status = 0;
+                        console.warn(`${LOG_PREFIX} GLTF load timeout`, { url: trimmed, timeout: timeoutMs });
+                        reject(timeoutError);
+                    }, timeoutMs);
+
+                    this.gltfLoader.load(
+                        url,
+                        (gltf) => {
+                            window.clearTimeout(timer);
+                            const duration = Math.round(performance.now() - start);
+                            console.info(`${LOG_PREFIX} GLTF loaded`, { url: trimmed, ms: duration });
+                            resolve(gltf);
+                        },
+                        undefined,
+                        (errorEvent) => {
+                            window.clearTimeout(timer);
+                            const details = this.describeLoaderError(errorEvent);
+                            const message = details.message || `Failed to load ${trimmed}`;
+                            const failureError = new Error(message);
+                            failureError.status = details.status;
+                            failureError.code = details.code;
+                            console.warn(`${LOG_PREFIX} GLTF load error`, { url: trimmed, status: details.status, code: details.code, message });
+                            reject(failureError);
+                        }
+                    );
                 });
             }
 
@@ -583,7 +997,7 @@
                 group.add(chimney);
                 group.name = `${template.label || 'Structure'} (Fallback)`;
                 group.userData.fallback = true;
-                group.userData.sourceUrl = url;
+                group.userData.sourceUrl = url ? this.trimBase(url) : null;
                 return group;
             }
         }
@@ -1092,7 +1506,7 @@
                 this.errorOverlay = document.getElementById('errorOverlay');
                 this.errorMessage = document.getElementById('errorMessage');
                 this.retryButton = document.getElementById('retryButton');
-                this.loadingOverlay = new LoadingOverlay();
+                this.loadingOverlay = GLOBAL_LOADING_OVERLAY;
                 this.clock = new THREE.Clock();
                 this.raycaster = new THREE.Raycaster();
                 this.focusedBuilding = null;
@@ -1103,7 +1517,11 @@
                 this.tempDirection = new THREE.Vector3();
 
                 if (this.retryButton) {
-                    this.retryButton.addEventListener('click', () => window.location.reload());
+                    this.retryButton.addEventListener('click', async () => {
+                        this.retryButton.disabled = true;
+                        this.retryButton.textContent = 'Retrying...';
+                        await clearBritanniaCachesAndReload();
+                    });
                 }
             }
 
@@ -1116,6 +1534,10 @@
                     this.setupLights();
 
                     this.assetLoader = new AssetLoader(this.loadingOverlay);
+                    this.assetLoader.manager.addEventListener('allDone', () => {
+                        this.loadingOverlay.setProgress(100);
+                        window.setTimeout(() => this.loadingOverlay.hide(), 400);
+                    });
                     this.regionManager = new RegionManager(this.scene, this.assetLoader, this.loadingOverlay);
 
                     this.loadingOverlay.setStatus('Shaping Britannia regions...');
@@ -1130,8 +1552,9 @@
 
                     this.animate();
                 } catch (error) {
-                    console.error('Game initialization failed:', error);
-                    this.showError(`Initialization failed: ${error.message}`);
+                    console.error(`${LOG_PREFIX} Game initialization failed:`, error);
+                    const reason = error?.message || 'Unknown error';
+                    this.showError(`Initialization failed: ${reason}`);
                 }
             }
 
@@ -1337,21 +1760,47 @@
 
             showError(message) {
                 if (this.loadingOverlay) {
-                    this.loadingOverlay.hide();
-                }
-                if (this.errorMessage) {
-                    this.errorMessage.textContent = message;
-                }
-                if (this.errorOverlay) {
-                    this.errorOverlay.style.display = 'flex';
+                    this.loadingOverlay.showFatal(message);
                 }
             }
         }
 
+        let allDoneAsserted = false;
+        window.addEventListener('britannia:assets-all-done', () => {
+            if (allDoneAsserted) {
+                return;
+            }
+            allDoneAsserted = true;
+            window.setTimeout(() => {
+                const overlayHidden = document.getElementById('loadingOverlay')?.classList.contains('hidden');
+                console.assert(overlayHidden, 'Loading overlay should hide after allDone event even if failures occur.');
+            }, 600);
+        });
+
+        const runSelfTests = (gamePromise) => {
+            gamePromise
+                .then(async (game) => {
+                    if (!game?.assetLoader) {
+                        return;
+                    }
+                    try {
+                        const fallback = await game.assetLoader.loadModel({ file: '__missing__.glb', label: 'Test Missing', __selfTest: true });
+                        console.assert(fallback?.userData?.fallback === true, 'Missing asset should fall back to placeholder geometry.');
+                    } catch (error) {
+                        console.error(`${LOG_PREFIX} Self-test (missing asset) failed`, error);
+                    }
+                })
+                .catch((error) => {
+                    console.warn(`${LOG_PREFIX} Self-test skipped`, error);
+                });
+        };
+
         const launchGame = () => {
             const game = new BritanniaGame();
-            game.init();
+            const initPromise = game.init();
             window.britanniaGame = game;
+            runSelfTests(Promise.resolve(initPromise).then(() => game));
+            return initPromise;
         };
 
         if (document.readyState === 'loading') {
