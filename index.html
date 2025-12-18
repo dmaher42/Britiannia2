@@ -233,7 +233,7 @@
         import { GLTFLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js?module";
         import { DRACOLoader } from "https://unpkg.com/three@0.160.1/examples/jsm/loaders/DRACOLoader.js?module";
         import { PointerLockControls } from "https://unpkg.com/three@0.160.1/examples/jsm/controls/PointerLockControls.js?module";
-        import { SkeletonUtils } from "https://unpkg.com/three@0.160.1/examples/jsm/utils/SkeletonUtils.js?module";
+        import * as SkeletonUtils from "https://unpkg.com/three@0.160.1/examples/jsm/utils/SkeletonUtils.js?module";
 
         const THREE_VERSION = "0.160.1";
         const THREE_BASE_URL = `https://unpkg.com/three@${THREE_VERSION}`;
@@ -790,7 +790,8 @@
                 };
                 this.loadingOverlay.setProgress(100);
                 this.loadingOverlay.setStatus('Finalizing structures...');
-                this.manager.dispatchEvent({ type: 'allDone', detail });
+                // Removed dispatchEvent as LoadingManager doesn't support it
+                // this.manager.dispatchEvent({ type: 'allDone', detail });
                 window.dispatchEvent(new CustomEvent('britannia:assets-all-done', { detail }));
                 if (failures.length) {
                     console.groupCollapsed(`${LOG_PREFIX} Asset load failures (${failures.length})`);
@@ -1534,7 +1535,7 @@
                     this.setupLights();
 
                     this.assetLoader = new AssetLoader(this.loadingOverlay);
-                    this.assetLoader.manager.addEventListener('allDone', () => {
+                    window.addEventListener('britannia:assets-all-done', () => {
                         this.loadingOverlay.setProgress(100);
                         window.setTimeout(() => this.loadingOverlay.hide(), 400);
                     });
