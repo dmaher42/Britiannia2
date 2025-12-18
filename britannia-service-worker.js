@@ -1,7 +1,7 @@
 const CORE_CACHE = 'britannia-core-v2';
 const MODEL_CACHE = 'britannia-models-v1';
 const MODEL_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const CORE_ASSETS = ['./', './index.html'];
+const CORE_ASSETS = ['./', './index.html', './js/PointerLockControls.js'];
 
 const stampResponse = async (response) => {
   const buffer = await response.clone().arrayBuffer();
